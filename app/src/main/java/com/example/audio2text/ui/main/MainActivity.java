@@ -10,6 +10,9 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.audio2text.R;
+import com.example.audio2text.ui.detail.DetailFragment;
+import com.example.audio2text.ui.history.HistoryFragment;
+import com.example.audio2text.ui.upload.UploadFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class MainActivity extends AppCompatActivity {
@@ -48,13 +51,11 @@ public class MainActivity extends AppCompatActivity {
             if (itemId == R.id.nav_home) {
                 selectedFragment = new MainFragment();
             } else if (itemId == R.id.nav_search) {
-                selectedFragment = new DetailFragment();
-            } else if (itemId == R.id.nav_upload) {
                 selectedFragment = new HistoryFragment();
-//            } else if (itemId == R.id.nav_notifications) {
-//                selectedFragment = new HistoryFragment();
-//            } else if (itemId == R.id.nav_profile) {
-//                selectedFragment = new ProfileFragment();
+            } else if (itemId == R.id.nav_upload) {
+                selectedFragment = new UploadFragment();
+            } else if (itemId == R.id.nav_profile) {
+                selectedFragment = new ProfileFragment();
             }
 
             if (selectedFragment != null) {
