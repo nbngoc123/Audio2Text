@@ -1,6 +1,7 @@
 package com.example.audio2text.ui.onboarding;
 
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Button;
 
@@ -10,6 +11,7 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.example.audio2text.R;
 import com.example.audio2text.adapter.OnboardingAdapter;
 import com.example.audio2text.model.OnboardingItem;
+import com.example.audio2text.ui.main.MainActivity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,7 +63,16 @@ public class OnboardingActivity extends AppCompatActivity {
             if (viewPager.getCurrentItem() + 1 < adapter.getItemCount()) {
                 viewPager.setCurrentItem(viewPager.getCurrentItem() + 1);
             } else {
-                finish(); // hoặc chuyển sang màn hình chính
+//                finish(); // test
+                // Lưu trạng thái đã xem Onboarding
+                getSharedPreferences("prefs", MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("onboarding_complete", false)
+                        .apply();
+
+                // Chuyển sang MainActivity
+                startActivity(new Intent(OnboardingActivity.this, MainActivity.class));
+                finish();
             }
         });
     }
