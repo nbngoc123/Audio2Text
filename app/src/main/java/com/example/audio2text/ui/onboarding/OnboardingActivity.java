@@ -67,7 +67,7 @@ public class OnboardingActivity extends AppCompatActivity {
                 // Lưu trạng thái đã xem Onboarding
                 getSharedPreferences("prefs", MODE_PRIVATE)
                         .edit()
-                        .putBoolean("onboarding_complete", false)
+                        .putBoolean("onboarding_complete", true)
                         .apply();
 
                 // Chuyển sang MainActivity
