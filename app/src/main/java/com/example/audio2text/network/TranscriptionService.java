@@ -4,6 +4,7 @@ import android.content.Context;
 import android.util.Log;
 
 import com.example.audio2text.util.ApiKey;
+import com.example.audio2text.model.TranscriptItem;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -13,9 +14,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
-import com.example.audio2text.model.TranscriptItem;
 import okhttp3.*;
 
 public class TranscriptionService {
@@ -30,12 +29,9 @@ public class TranscriptionService {
         this.context = context;
     }
 
+    /** Upload file audio */
     public String uploadFile(File file) throws IOException {
-        if (!file.exists() || file.length() == 0) {
-            Log.e(TAG, "File không tồn tại hoặc rỗng: " + file.getAbsolutePath());
-            return null;
-        }
-        Log.d(TAG, "Upload file: " + file.getAbsolutePath() + " (" + file.length() + " bytes)");
+        if (!file.exists() || file.length() == 0) return null;
 
         RequestBody body = RequestBody.create(file, MediaType.get("application/octet-stream"));
         Request req = new Request.Builder()
@@ -45,12 +41,9 @@ public class TranscriptionService {
                 .build();
 
         try (Response res = client.newCall(req).execute()) {
-            String responseBody = res.body() != null ? res.body().string() : "No body";
-            Log.d(TAG, "Upload response code: " + res.code());
-            Log.d(TAG, "Upload response body: " + responseBody);
-
+            String responseBody = res.body() != null ? res.body().string() : "";
             if (!res.isSuccessful()) {
-                Log.e(TAG, "Upload failed: " + res.code() + " - " + responseBody);
+                Log.e(TAG, "Upload failed: " + res.code() + " " + responseBody);
                 return null;
             }
             JSONObject j = new JSONObject(responseBody);
@@ -61,209 +54,7 @@ public class TranscriptionService {
         }
     }
 
-    /**
-     *  CẢI TIẾN: Parse sentences với logic tách câu thông minh
-     * - Ưu tiên utterances (có speaker)
-     * - Nếu không có, dùng sentences
-     * - THÊM: Tách câu dựa trên từ viết hoa (AI-like)
-     */
-    public static List<TranscriptItem> parseSentences(String json) {
-        List<TranscriptItem> list = new ArrayList<>();
-        try {
-            JSONObject root = new JSONObject(json);
-
-            // 1️ ƯU TIÊN: Utterances (có speaker_labels)
-            JSONArray utterances = root.optJSONArray("utterances");
-            if (utterances != null && utterances.length() > 0) {
-                Log.d(TAG, "Sử dụng utterances: " + utterances.length() + " items");
-                for (int i = 0; i < utterances.length(); i++) {
-                    JSONObject utterance = utterances.getJSONObject(i);
-                    String speaker = utterance.optString("speaker", "");
-
-                    JSONArray words = utterance.optJSONArray("words");
-                    if (words != null && words.length() > 0) {
-                        StringBuilder textBuilder = new StringBuilder();
-                        long start = words.getJSONObject(0).optLong("start");
-                        long end = words.getJSONObject(words.length() - 1).optLong("end");
-
-                        // Xây dựng text từ words
-                        for (int j = 0; j < words.length(); j++) {
-                            String wordText = words.getJSONObject(j).optString("text");
-                            textBuilder.append(wordText);
-                            if (j < words.length() - 1) textBuilder.append(" ");
-                        }
-
-                        String text = textBuilder.toString();
-                        String label = formatTimestampRange(start, end);
-
-                        list.add(new TranscriptItem(label, text, start, end, speaker));
-                    }
-                }
-            }
-            // 2️ FALLBACK: Sentences thông thường
-            else {
-                JSONArray sentences = root.optJSONArray("sentences");
-                if (sentences != null && sentences.length() > 0) {
-                    Log.d(TAG, "Sử dụng sentences: " + sentences.length() + " items");
-                    for (int i = 0; i < sentences.length(); i++) {
-                        JSONObject s = sentences.getJSONObject(i);
-                        long start = s.optLong("start");
-                        long end = s.optLong("end");
-                        String text = s.optString("text");
-                        String speaker = s.optString("speaker", "");
-                        String label = formatTimestampRange(start, end);
-
-                        list.add(new TranscriptItem(label, text, start, end, speaker));
-                    }
-                }
-            }
-
-            // 3⃣ AI LOGIC: Tách câu thông minh nếu có từ viết hoa
-            if (list.size() <= 3) { // Chỉ áp dụng khi ít câu (có thể bị gộp)
-                Log.d(TAG, "Áp dụng AI sentence splitting...");
-                list = splitSentencesByCapitalization(list);
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "Parse sentences error", e);
-        }
-
-        Log.d(TAG, "Tổng số câu sau parse: " + list.size());
-        return list;
-    }
-
-    /**
-     * 🚀 AI LOGIC: Tách câu dựa trên từ viết hoa
-     * Ví dụ: "Hello world. This is a test. Bye bye."
-     * → Tách thành 3 câu riêng biệt
-     */
-    private static List<TranscriptItem> splitSentencesByCapitalization(List<TranscriptItem> original) {
-        List<TranscriptItem> result = new ArrayList<>();
-
-        for (TranscriptItem item : original) {
-            String fullText = item.text;
-            long totalDuration = item.endTimeMs - item.startTimeMs;
-            int numSentences = 1; // Mặc định
-
-            // 🔍 Tìm vị trí từ viết hoa (bắt đầu câu mới)
-            // Pattern: [A-Z][a-z]+ (từ viết hoa + chữ thường)
-            Pattern capitalPattern = Pattern.compile("\\b[A-Z][a-z]+");
-            java.util.regex.Matcher matcher = capitalPattern.matcher(fullText);
-
-            List<Integer> capitalPositions = new ArrayList<>();
-            while (matcher.find()) {
-                capitalPositions.add(matcher.start());
-            }
-
-            // Nếu có từ viết hoa → ước lượng số câu
-            if (capitalPositions.size() > 1) {
-                numSentences = capitalPositions.size();
-                Log.d(TAG, "Phát hiện " + numSentences + " câu tiềm năng trong: " + fullText.substring(0, Math.min(50, fullText.length())));
-            }
-
-            // 📝 Tách text theo dấu câu + từ viết hoa
-            String[] sentences = splitTextIntelligent(fullText);
-
-            // ⏱️ Phân bổ thời gian đều cho các câu
-            long durationPerSentence = totalDuration / Math.max(1, sentences.length);
-
-            long currentTime = item.startTimeMs;
-            for (int i = 0; i < sentences.length; i++) {
-                String sentenceText = sentences[i].trim();
-                if (!sentenceText.isEmpty()) {
-                    long sentenceStart = currentTime;
-                    long sentenceEnd = Math.min(sentenceStart + durationPerSentence, item.endTimeMs);
-
-                    String label = formatTimestampRange(sentenceStart, sentenceEnd);
-                    result.add(new TranscriptItem(label, sentenceText, sentenceStart, sentenceEnd, item.speaker));
-
-                    currentTime = sentenceEnd;
-                }
-            }
-        }
-
-        return result.isEmpty() ? original : result;
-    }
-
-    /**
-     *  Tách text thông minh: Dấu câu + từ viết hoa
-     */
-    private static String[] splitTextIntelligent(String text) {
-        // 1️⃣ Tách theo dấu câu trước
-        String[] byPunctuation = text.split("[.!?]+");
-
-        // 2️⃣ Tách thêm theo từ viết hoa (nếu câu dài)
-        List<String> finalSentences = new ArrayList<>();
-        for (String part : byPunctuation) {
-            part = part.trim();
-            if (part.isEmpty()) continue;
-
-            // Nếu câu dài và có từ viết hoa → tách thêm
-            if (part.length() > 20 && hasMultipleCapitals(part)) {
-                String[] capitalSplit = splitByCapitalWords(part);
-                for (String s : capitalSplit) {
-                    if (!s.trim().isEmpty()) {
-                        finalSentences.add(s.trim());
-                    }
-                }
-            } else {
-                finalSentences.add(part);
-            }
-        }
-
-        return finalSentences.toArray(new String[0]);
-    }
-
-    /**
-     * 🔍 Kiểm tra có nhiều từ viết hoa trong câu không
-     */
-    private static boolean hasMultipleCapitals(String text) {
-        Pattern capitalPattern = Pattern.compile("\\b[A-Z][a-z]+");
-        java.util.regex.Matcher matcher = capitalPattern.matcher(text);
-        int count = 0;
-        while (matcher.find()) {
-            count++;
-            if (count >= 2) return true;
-        }
-        return false;
-    }
-
-    /**
-     * 📝 Tách câu theo từ viết hoa
-     */
-    private static String[] splitByCapitalWords(String text) {
-        // Tìm tất cả từ viết hoa
-        Pattern capitalPattern = Pattern.compile("\\b[A-Z][a-z]+");
-        java.util.regex.Matcher matcher = capitalPattern.matcher(text);
-
-        List<Integer> positions = new ArrayList<>();
-        while (matcher.find()) {
-            positions.add(matcher.start());
-        }
-
-        if (positions.size() < 2) return new String[]{text};
-
-        List<String> sentences = new ArrayList<>();
-        int start = 0;
-
-        for (int i = 1; i < positions.size(); i++) {
-            int end = positions.get(i);
-            String sentence = text.substring(start, end).trim();
-            if (!sentence.isEmpty()) {
-                sentences.add(sentence + "."); // Thêm dấu chấm
-            }
-            start = end;
-        }
-
-        // Câu cuối
-        String lastSentence = text.substring(start).trim();
-        if (!lastSentence.isEmpty()) {
-            sentences.add(lastSentence + ".");
-        }
-
-        return sentences.toArray(new String[0]);
-    }
-
+    /** Tạo transcript từ upload URL */
     public JSONObject createTranscript(String uploadUrl) throws IOException {
         JSONObject bodyJson = new JSONObject();
         try {
@@ -271,13 +62,11 @@ public class TranscriptionService {
             bodyJson.put("speaker_labels", true);
             bodyJson.put("format_text", true);
             bodyJson.put("language_detection", true);
-            // Thêm: Cải thiện punctuation để tách câu tốt hơn
-            bodyJson.put("punctuate", true);
         } catch (Exception ignored) {}
 
         RequestBody body = RequestBody.create(
                 bodyJson.toString(),
-                MediaType.get("application/json") //  Fix deprecated
+                MediaType.parse("application/json")
         );
 
         Request req = new Request.Builder()
@@ -287,14 +76,11 @@ public class TranscriptionService {
                 .build();
 
         try (Response res = client.newCall(req).execute()) {
-            String responseBody = res.body() != null ? res.body().string() : "No body";
-
+            String responseBody = res.body() != null ? res.body().string() : "";
             if (!res.isSuccessful()) {
-                Log.e(TAG, "create transcript failed: " + res.code() + ", body: " + responseBody);
+                Log.e(TAG, "create transcript failed: " + res.code() + " " + responseBody);
                 return null;
             }
-
-            Log.d(TAG, "create transcript success, ID: " + new JSONObject(responseBody).optString("id"));
             return new JSONObject(responseBody);
         } catch (Exception e) {
             Log.e(TAG, "create transcript error", e);
@@ -302,6 +88,7 @@ public class TranscriptionService {
         }
     }
 
+    /** Poll until completed, trả về JSON transcript */
     public JSONObject pollForResult(String transcriptId, int maxAttempts, long delayMs)
             throws IOException, InterruptedException {
         String url = TRANSCRIPT_URL + "/" + transcriptId;
@@ -311,31 +98,103 @@ public class TranscriptionService {
                     .header("authorization", ApiKey.apiKey)
                     .get()
                     .build();
-
             try (Response res = client.newCall(req).execute()) {
-                if (!res.isSuccessful()) {
-                    Log.e(TAG, "poll failed: " + res.code());
-                    return null;
-                }
-                String responseBody = res.body().string();
-                JSONObject j = new JSONObject(responseBody);
+                if (!res.isSuccessful()) return null;
+                JSONObject j = new JSONObject(res.body().string());
                 String status = j.optString("status", "");
-
-                Log.d(TAG, String.format("Poll %d/%d - Status: %s", i + 1, maxAttempts, status));
-
-                if ("completed".equals(status) || "error".equals(status)) {
-                    if ("error".equals(status)) {
-                        Log.e(TAG, "Transcript error: " + j.optString("error", "Unknown error"));
-                    }
-                    return j;
-                }
+                if ("completed".equals(status) || "error".equals(status)) return j;
             } catch (JSONException e) {
                 throw new RuntimeException(e);
             }
             Thread.sleep(delayMs);
         }
-        Log.w(TAG, "Poll timeout after " + maxAttempts + " attempts");
         return null;
+    }
+
+    /** Parse sentences (utterances hoặc sentences) + split chữ hoa nếu cần */
+    public static List<TranscriptItem> parseSentences(String json) {
+        List<TranscriptItem> list = new ArrayList<>();
+        try {
+            JSONObject root = new JSONObject(json);
+
+            JSONArray utterances = root.optJSONArray("utterances");
+            if (utterances != null) {
+                for (int i = 0; i < utterances.length(); i++) {
+                    JSONObject u = utterances.getJSONObject(i);
+                    String speaker = u.optString("speaker", "");
+                    JSONArray words = u.optJSONArray("words");
+                    if (words != null && words.length() > 0) {
+                        long start = words.getJSONObject(0).optLong("start");
+                        long end = words.getJSONObject(words.length()-1).optLong("end");
+                        StringBuilder sb = new StringBuilder();
+                        for (int j=0;j<words.length();j++) {
+                            sb.append(words.getJSONObject(j).optString("text"));
+                            if (j<words.length()-1) sb.append(" ");
+                        }
+                        list.add(new TranscriptItem(formatTimestampRange(start,end),
+                                sb.toString(), start, end, speaker));
+                    }
+                }
+            } else {
+                JSONArray sentences = root.optJSONArray("sentences");
+                if (sentences != null) {
+                    for (int i=0;i<sentences.length();i++) {
+                        JSONObject s = sentences.getJSONObject(i);
+                        long start = s.optLong("start");
+                        long end = s.optLong("end");
+                        String text = s.optString("text");
+                        String speaker = s.optString("speaker","");
+                        list.add(new TranscriptItem(formatTimestampRange(start,end),
+                                text, start, end, speaker));
+                    }
+                }
+            }
+
+            // Split text dài theo chữ hoa
+            list = splitSentencesByCapital(list);
+
+        } catch (Exception e) {
+            Log.e(TAG, "parseSentences error", e);
+        }
+        return list;
+    }
+
+    /** Split text dài theo chữ hoa (mỗi chữ hoa sau khoảng trắng là câu mới) */
+    private static List<TranscriptItem> splitSentencesByCapital(List<TranscriptItem> original) {
+        List<TranscriptItem> result = new ArrayList<>();
+        for (TranscriptItem item : original) {
+            String text = item.text;
+            long start = item.startTimeMs;
+            long end = item.endTimeMs;
+            String speaker = item.speaker;
+
+            if (text.length() > 50) { // chỉ tách text dài
+                List<String> sentences = new ArrayList<>();
+                int last = 0;
+                for (int i=1;i<text.length();i++) {
+                    char c = text.charAt(i);
+                    if (Character.isUpperCase(c) && text.charAt(i-1)==' ') {
+                        sentences.add(text.substring(last,i).trim());
+                        last = i;
+                    }
+                }
+                sentences.add(text.substring(last).trim());
+
+                long durationPerSentence = (end-start)/sentences.size();
+                long current = start;
+                for (String s: sentences) {
+                    if (!s.isEmpty()) {
+                        long sentenceEnd = current+durationPerSentence;
+                        result.add(new TranscriptItem(formatTimestampRange(current,sentenceEnd),
+                                s, current, sentenceEnd, speaker));
+                        current = sentenceEnd;
+                    }
+                }
+            } else {
+                result.add(item); // giữ nguyên
+            }
+        }
+        return result.isEmpty()?original:result;
     }
 
     private static String formatTimestampRange(long startMs, long endMs) {
@@ -343,14 +202,10 @@ public class TranscriptionService {
     }
 
     private static String formatTimestamp(long ms) {
-        long totalSec = ms / 1000;
-        long sec = totalSec % 60;
-        long min = (totalSec / 60) % 60;
-        long hr = totalSec / 3600;
-
-        if (hr > 0)
-            return String.format("%d:%02d:%02d", hr, min, sec);
-        else
-            return String.format("%d:%02d", min, sec);
+        long sec = (ms/1000)%60;
+        long min = (ms/60000)%60;
+        long hr = ms/3600000;
+        if (hr>0) return String.format("%d:%02d:%02d",hr,min,sec);
+        return String.format("%d:%02d", min, sec);
     }
 }

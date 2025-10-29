@@ -7,6 +7,7 @@
     android:background="#121212"
     android:id="@+id/main"
     android:fitsSystemWindows="true"
+    android:paddingBottom="60dp"
     >
 
     <!-- Header -->
@@ -57,6 +58,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:layout_marginBottom="60dp"
         android:background="#121212"/>
 
     <!-- Bottom Navigation – ĐẶT CUỐI CÙNG TRONG LAYOUT -->
@@ -65,19 +67,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:layout_marginStart="0dp"
         android:layout_marginEnd="0dp"
-        android:layout_marginBottom="8dp"
-        android:paddingVertical="8dp"
+        android:layout_marginBottom="0dp"
+        android:paddingVertical="4dp"
         android:background="@drawable/bg_bottom_nav"
-        app:itemIconSize="26dp"
+        app:itemIconSize="24dp"
         app:itemPadding="0dp"
         app:menu="@menu/bottom_nav_menu"
         app:labelVisibilityMode="labeled"
         app:itemIconTint="@color/nav_item_color"
         app:itemTextColor="@color/nav_item_color"
-        app:elevation="8dp" />
+        app:elevation="0dp"
+        app:itemRippleColor="@android:color/transparent" />
 
-<!--        app:itemIconTint="@color/nav_item_color"-->
-<!--        app:itemTextColor="@color/nav_item_color"-->
 </LinearLayout>
