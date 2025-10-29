@@ -1,20 +1,15 @@
 package com.example.audio2text.model;
 
 public class TranscriptionRecord {
-    private int id;
-    private String audioUri;
-    private String transcript;
-    private String createdAt;
+    public int id;
+    public String filename;
+    public String audioUri;
+    public String transcript; // full text (optional)
+    public String createdAt;
 
-    public TranscriptionRecord(int id, String audioUri, String transcript, String createdAt) {
+    public TranscriptionRecord(int id, String filename, String audioUri, String transcript, String createdAt) {
         this.id = id;
-        this.audioUri = audioUri;
-        this.transcript = transcript;
-        this.createdAt = createdAt;
-    }
-
-    // Constructor không có id (dùng khi insert mới)
-    public TranscriptionRecord(String audioUri, String transcript, String createdAt) {
+        this.filename = filename;
         this.audioUri = audioUri;
         this.transcript = transcript;
         this.createdAt = createdAt;
@@ -24,28 +19,36 @@ public class TranscriptionRecord {
         return id;
     }
 
-    public String getAudioUri() {
-        return audioUri;
-    }
-
-    public String getTranscript() {
-        return transcript;
-    }
-
-    public String getCreatedAt() {
-        return createdAt;
-    }
-
     public void setId(int id) {
         this.id = id;
+    }
+
+    public String getFilename() {
+        return filename;
+    }
+
+    public void setFilename(String filename) {
+        this.filename = filename;
+    }
+
+    public String getAudioUri() {
+        return audioUri;
     }
 
     public void setAudioUri(String audioUri) {
         this.audioUri = audioUri;
     }
 
+    public String getTranscript() {
+        return transcript;
+    }
+
     public void setTranscript(String transcript) {
         this.transcript = transcript;
+    }
+
+    public String getCreatedAt() {
+        return createdAt;
     }
 
     public void setCreatedAt(String createdAt) {

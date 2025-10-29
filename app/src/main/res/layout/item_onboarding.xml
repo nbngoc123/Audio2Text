@@ -17,7 +17,7 @@
         android:layout_marginBottom="24dp"
         android:contentDescription="@string/onboarding_image"
         android:scaleType="centerInside"
-        android:background="@drawable/bg_logo_round"
+        android:background="@drawable/bg_logo_round2"
         android:padding="24dp"
         android:clipToOutline="true"
         app:layout_constraintTop_toTopOf="parent"

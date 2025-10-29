@@ -40,19 +40,21 @@ public class OnboardingActivity extends AppCompatActivity {
     private void setupOnboardingItems() {
         List<OnboardingItem> items = new ArrayList<>();
         items.add(new OnboardingItem(
-                R.drawable.ic_audio_logo,
-                "Convert Audio Effortlessly",
-                "Easily turn your voice recordings into readable, editable text."
+                R.drawable.boarding_edit_audio,
+                "Chuyển âm thanh dễ dàng",
+                "Biến các bản ghi giọng nói thành văn bản đọc được và chỉnh sửa nhanh chóng."
         ));
+
         items.add(new OnboardingItem(
-                R.drawable.ic_audio_logo,
-                "Smart Transcription",
-                "Automatically detect languages and optimize your text output."
+                R.drawable.boarding_smart,
+                "Phiên âm thông minh",
+                "Tự động nhận diện ngôn ngữ và tối ưu hóa kết quả văn bản."
         ));
+
         items.add(new OnboardingItem(
-                R.drawable.ic_audio_logo,
-                "Ready to Use",
-                "Export and share your transcriptions instantly."
+                R.drawable.boarding_smart_1,
+                "Sẵn sàng sử dụng",
+                "Xuất và chia sẻ bản phiên âm của bạn ngay lập tức."
         ));
 
         adapter = new OnboardingAdapter(items);

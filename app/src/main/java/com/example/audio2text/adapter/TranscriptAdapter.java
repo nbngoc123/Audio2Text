@@ -5,6 +5,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.audio2text.R;
@@ -12,61 +13,56 @@ import com.example.audio2text.model.TranscriptItem;
 
 import java.util.List;
 
-public class TranscriptAdapter extends RecyclerView.Adapter<TranscriptAdapter.ViewHolder> {
-    private List<TranscriptItem> items;
-    private int selectedPosition = -1;
+public class TranscriptAdapter extends RecyclerView.Adapter<TranscriptAdapter.VH> {
+
+    private final List<TranscriptItem> items;
+    private int selected = -1;
     private OnItemClickListener listener;
 
-    public TranscriptAdapter(List<TranscriptItem> items) {
-        this.items = items;
+    public interface OnItemClickListener {
+        void onItemClick(int position, long seekToMs);
     }
 
-    public int getSelectedPosition() {
-        return selectedPosition;
-    }
-    public void setSelectedPosition(int position) {
-        int prev = selectedPosition;
-        selectedPosition = position;
+    public void setOnItemClickListener(OnItemClickListener l) { this.listener = l; }
+
+    public TranscriptAdapter(List<TranscriptItem> items) { this.items = items; }
+
+    public void setSelectedPosition(int pos) {
+        int prev = selected;
+        selected = pos;
         if (prev != -1) notifyItemChanged(prev);
-        notifyItemChanged(selectedPosition);
+        if (selected != -1) notifyItemChanged(selected);
     }
 
-    public void setOnItemClickListener(OnItemClickListener l) {
-        this.listener = l;
+    public int getSelectedPosition() { return selected; }
+
+    @NonNull
+    @Override
+    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_transcript_line, parent, false);
+        return new VH(v);
     }
 
     @Override
-    public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_transcript, parent, false);
-        return new ViewHolder(view);
-    }
-
-    @Override
-    public void onBindViewHolder(ViewHolder holder, int position) {
-        TranscriptItem item = items.get(position);
-        holder.tvTimestamp.setText(item.timestamp);
-        holder.tvText.setText(item.text);
-        holder.itemView.setSelected(position == selectedPosition);
-
+    public void onBindViewHolder(@NonNull VH holder, int position) {
+        TranscriptItem it = items.get(position);
+        holder.tvTime.setText(it.label);
+        holder.tvText.setText(it.text);
+        holder.itemView.setSelected(position == selected);
         holder.itemView.setOnClickListener(v -> {
-            if (listener != null) listener.onItemClick(position, item.startTimeMs);
+            if (listener != null) listener.onItemClick(position, it.startTimeMs);
         });
     }
 
     @Override
     public int getItemCount() { return items.size(); }
 
-    static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView tvTimestamp, tvText;
-        public ViewHolder(View itemView) {
-            super(itemView);
-            tvTimestamp = itemView.findViewById(R.id.tv_timestamp);
-            tvText = itemView.findViewById(R.id.tv_text);
+    static class VH extends RecyclerView.ViewHolder {
+        TextView tvTime, tvText;
+        VH(@NonNull View v) {
+            super(v);
+            tvTime = v.findViewById(R.id.tv_timestamp);
+            tvText = v.findViewById(R.id.tv_text);
         }
-    }
-
-    public interface OnItemClickListener {
-        void onItemClick(int position, long seekToMs);
     }
 }

@@ -6,6 +6,7 @@
     android:orientation="vertical"
     android:background="#121212"
     android:id="@+id/main"
+    android:fitsSystemWindows="true"
     >
 
     <!-- Header -->

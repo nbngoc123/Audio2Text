@@ -2,11 +2,10 @@ package com.example.audio2text.ui.history;
 
 import android.database.Cursor;
 import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
@@ -17,6 +16,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.audio2text.R;
 import com.example.audio2text.data.db.TranscriptionDatabaseHelper;
+import com.example.audio2text.model.TranscriptionRecord;
 import com.example.audio2text.ui.main.MainFragment;
 
 import java.util.ArrayList;
@@ -27,73 +27,42 @@ public class HistoryFragment extends Fragment {
     private EditText searchBar;
     private ListView historyList;
     private ArrayAdapter<String> adapter;
+    private List<TranscriptionRecord> records = new ArrayList<>();
     private List<String> filenames = new ArrayList<>();
-    private List<String> filepaths = new ArrayList<>();
-    private List<String> transcripts = new ArrayList<>();
-    private TranscriptionDatabaseHelper dbHelper;
+    private TranscriptionDatabaseHelper db;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_history, container, false);
-
-        searchBar = view.findViewById(R.id.searchBar);
-        historyList = view.findViewById(R.id.historyList);
-
-        dbHelper = new TranscriptionDatabaseHelper(requireContext());
-        loadHistory();
-
-        adapter = new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_list_item_1, filenames);
+        View v = inflater.inflate(R.layout.fragment_history, container, false);
+        searchBar = v.findViewById(R.id.searchBar);
+        historyList = v.findViewById(R.id.historyList);
+        db = new TranscriptionDatabaseHelper(requireContext());
+        load();
+        adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_list_item_1, filenames);
         historyList.setAdapter(adapter);
 
-        // 🔍 Tìm kiếm theo tên file
-        searchBar.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                adapter.getFilter().filter(s);
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        });
-
-        // 🎧 Khi click vào 1 item trong danh sách
-        historyList.setOnItemClickListener((parent, v, position, id) -> {
-            String filepath = filepaths.get(position);
-            String transcript = transcripts.get(position);
-
-            // Tạo fragment mới với dữ liệu từ SQLite
-            MainFragment fragment = MainFragment.newInstance(filepath, transcript);
-
-            // Chuyển sang màn hình nghe phát lại
+        historyList.setOnItemClickListener((parent, view, position, id) -> {
+            TranscriptionRecord r = records.get(position);
+            // open MainFragment with filepath and transcript
+            MainFragment f = MainFragment.newInstance(r.id, r.transcript);
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
-                    .replace(R.id.main_container, fragment)
+                    .replace(R.id.main_container, f)
                     .addToBackStack(null)
                     .commit();
         });
 
-        return view;
+        return v;
     }
 
-    private void loadHistory() {
-        Cursor cursor = dbHelper.getAllTranscriptions();
+    private void load() {
+        records.clear();
         filenames.clear();
-        filepaths.clear();
-        transcripts.clear();
-
-        if (cursor != null && cursor.moveToFirst()) {
-            int idxName = cursor.getColumnIndex(TranscriptionDatabaseHelper.COLUMN_FILENAME);
-            int idxPath = cursor.getColumnIndex(TranscriptionDatabaseHelper.COLUMN_FILEPATH);
-            int idxTranscript = cursor.getColumnIndex(TranscriptionDatabaseHelper.COLUMN_TRANSCRIPT);
-
-            do {
-                filenames.add(cursor.getString(idxName));
-                filepaths.add(cursor.getString(idxPath));
-                transcripts.add(cursor.getString(idxTranscript));
-            } while (cursor.moveToNext());
-
-            cursor.close();
+        for (TranscriptionRecord r : db.getAllTranscriptions()) {
+            records.add(r);
+            filenames.add(r.filename + " — " + r.createdAt);
         }
     }
 }

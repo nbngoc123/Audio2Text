@@ -1,192 +1,198 @@
 package com.example.audio2text.network;
 
 import android.content.Context;
-import android.net.Uri;
 import android.util.Log;
 
 import com.example.audio2text.util.ApiKey;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.example.audio2text.model.TranscriptItem;
+import okhttp3.*;
 
 public class TranscriptionService {
+    private static final String TAG = "TranscriptionService";
+    private static final String UPLOAD_URL = "https://api.assemblyai.com/v2/upload";
+    private static final String TRANSCRIPT_URL = "https://api.assemblyai.com/v2/transcript";
 
-    private static final String BASE_URL = "https://api.assemblyai.com/v2";
-    private static final String UPLOAD_URL = BASE_URL + "/upload";
-    private static final String TRANSCRIPT_URL = BASE_URL + "/transcript";
-    private static final String SENTENCE_URL = BASE_URL + "/transcript/%s/sentences";  // {id}/sentences
-
+    private final OkHttpClient client = new OkHttpClient();
     private final Context context;
 
     public TranscriptionService(Context context) {
         this.context = context;
     }
 
-    public String uploadAndTranscribe(Uri audioUri) {
+    public String uploadFile(File file) throws IOException {
+        if (!file.exists() || file.length() == 0) {
+            Log.e(TAG, "File không tồn tại hoặc rỗng: " + file.getAbsolutePath());
+            return null;
+        }
+        Log.d(TAG, "Upload file: " + file.getAbsolutePath() + " (" + file.length() + " bytes)");
+
+        // ✅ Fix deprecated: MediaType.get thay parse
+        RequestBody body = RequestBody.create(file, MediaType.get("application/octet-stream"));
+        Request req = new Request.Builder()
+                .url(UPLOAD_URL)
+                .header("authorization", ApiKey.apiKey)
+                .post(body)
+                .build();
+
+        try (Response res = client.newCall(req).execute()) {
+            String responseBody = res.body() != null ? res.body().string() : "No body";
+            Log.d(TAG, "Upload response code: " + res.code());
+            Log.d(TAG, "Upload response body: " + responseBody);
+
+            if (!res.isSuccessful()) {
+                Log.e(TAG, "Upload failed: " + res.code() + " - " + responseBody);
+                return null;
+            }
+            JSONObject j = new JSONObject(responseBody);
+            return j.optString("upload_url", null);
+        } catch (Exception e) {
+            Log.e(TAG, "Upload error", e);
+            return null;
+        }
+    }
+
+    public static List<TranscriptItem> parseSentences(String json) {
+        List<TranscriptItem> list = new ArrayList<>();
         try {
-            // 1. Upload file → lấy upload_url
-            String uploadUrl = uploadFile(audioUri);
-            if (uploadUrl == null) return null;
+            JSONObject root = new JSONObject(json);
 
-            // 2. Submit transcript với language_detection: true
-            String transcriptId = requestTranscription(uploadUrl);
-            if (transcriptId == null) return null;
+            // Dùng utterances nếu có speaker_labels
+            JSONArray utterances = root.optJSONArray("utterances");
+            if (utterances != null) {
+                for (int i = 0; i < utterances.length(); i++) {
+                    JSONObject utterance = utterances.getJSONObject(i);
+                    String speaker = utterance.optString("speaker", "");
 
-            // 3. Polling đến completed + lấy language_code
-            String languageCode = waitForCompletion(transcriptId);
-            if (languageCode == null) return null;
+                    JSONArray words = utterance.optJSONArray("words");
+                    if (words != null && words.length() > 0) {
+                        StringBuilder textBuilder = new StringBuilder();
+                        long start = words.getJSONObject(0).optLong("start");
+                        long end = words.getJSONObject(words.length() - 1).optLong("end");
 
-            // 4. Lấy sentences với timestamp
-            return getSentences(transcriptId, languageCode);
+                        for (int j = 0; j < words.length(); j++) {
+                            String wordText = words.getJSONObject(j).optString("text");
+                            textBuilder.append(wordText);
+                            if (j < words.length() - 1) textBuilder.append(" ");
+                        }
+
+                        String text = textBuilder.toString();
+                        String label = formatTimestampRange(start, end);
+
+                        list.add(new TranscriptItem(label, text, start, end, speaker));
+                    }
+                }
+            } else {
+                // fallback sang sentences nếu utterances không có
+                JSONArray sentences = root.optJSONArray("sentences");
+                if (sentences != null) {
+                    for (int i = 0; i < sentences.length(); i++) {
+                        JSONObject s = sentences.getJSONObject(i);
+                        long start = s.optLong("start");
+                        long end = s.optLong("end");
+                        String text = s.optString("text");
+                        String speaker = s.optString("speaker", "");
+                        String label = formatTimestampRange(start, end);
+
+                        list.add(new TranscriptItem(label, text, start, end, speaker));
+                    }
+                }
+            }
 
         } catch (Exception e) {
-            Log.e("TranscriptionService", "Error: " + e.getMessage());
-            return null;
+            e.printStackTrace();
         }
+        return list;
     }
 
-    private String uploadFile(Uri uri) throws Exception {
-        InputStream inputStream = context.getContentResolver().openInputStream(uri);
-        if (inputStream == null) return null;
+    public JSONObject createTranscript(String uploadUrl) throws IOException {
+    JSONObject bodyJson = new JSONObject();
+    try {
+        bodyJson.put("audio_url", uploadUrl);
+        bodyJson.put("speaker_labels", true);
+        bodyJson.put("format_text", true);
+        bodyJson.put("language_detection", true);
+    } catch (Exception ignored) {}
 
-        URL url = new URL(UPLOAD_URL);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Authorization", ApiKey.apiKey);
-        conn.setDoOutput(true);
+    RequestBody body = RequestBody.create(
+            bodyJson.toString(),
+            MediaType.parse("application/json")
+    );
 
-        DataOutputStream out = new DataOutputStream(conn.getOutputStream());
-        byte[] buffer = new byte[4096];
-        int bytesRead;
-        while ((bytesRead = inputStream.read(buffer)) != -1) {
-            out.write(buffer, 0, bytesRead);
-        }
-        out.flush();
-        out.close();
-        inputStream.close();
+    Request req = new Request.Builder()
+            .url(TRANSCRIPT_URL)
+            .header("authorization", ApiKey.apiKey)
+            .post(body)
+            .build();
 
-        int responseCode = conn.getResponseCode();
-        if (responseCode != 200) {
-            Log.e("Upload", "Error code: " + responseCode);
-            return null;
-        }
+    try (Response res = client.newCall(req).execute()) {
+        String responseBody = res.body().string(); // ĐỌC TRƯỚC KHI ĐÓNG
 
-        BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        JSONObject response = new JSONObject(br.readLine());
-        br.close();
-        conn.disconnect();
-        return response.getString("upload_url");  // Đúng spec
-    }
-
-    private String requestTranscription(String uploadUrl) throws Exception {
-        URL url = new URL(TRANSCRIPT_URL);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Authorization", ApiKey.apiKey);
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setDoOutput(true);
-
-        JSONObject body = new JSONObject();
-        body.put("audio_url", uploadUrl);
-        body.put("language_detection", true);  // ✅ Enable auto-detect
-        // Thêm nếu cần: body.put("speaker_labels", true); cho multi-speaker
-
-        DataOutputStream out = new DataOutputStream(conn.getOutputStream());
-        out.writeBytes(body.toString());
-        out.flush();
-        out.close();
-
-        int responseCode = conn.getResponseCode();
-        if (responseCode != 200) {
-            Log.e("TranscriptRequest", "Error code: " + responseCode);
+        if (!res.isSuccessful()) {
+            Log.e(TAG, "create transcript failed: " + res.code() + ", body: " + responseBody);
             return null;
         }
 
-        BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        JSONObject response = new JSONObject(br.readLine());
-        br.close();
-        conn.disconnect();
-        return response.getString("id");  // Đúng spec
+        Log.d(TAG, "create transcript success: " + responseBody);
+        return new JSONObject(responseBody);
+    } catch (Exception e) {
+        Log.e(TAG, "create transcript error", e);
+        return null;
     }
+}
+    // Poll until completed or error. Returns transcript JSON (GET /v2/transcript/{id})
 
-    private String waitForCompletion(String transcriptId) throws Exception {
-        while (true) {
-            URL url = new URL(TRANSCRIPT_URL + "/" + transcriptId);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestProperty("Authorization", ApiKey.apiKey);
+    public JSONObject pollForResult(String transcriptId, int maxAttempts, long delayMs)
+            throws IOException, InterruptedException {
+        String url = TRANSCRIPT_URL + "/" + transcriptId;
+        for (int i = 0; i < maxAttempts; i++) {
+            Request req = new Request.Builder()
+                    .url(url)
+                    .header("authorization", ApiKey.apiKey)
+                    .get()
+                    .build();
 
-            int responseCode = conn.getResponseCode();
-            if (responseCode != 200) {
-                Log.e("Polling", "Error code: " + responseCode);
-                conn.disconnect();
-                return null;
-            }
-
-            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            JSONObject response = new JSONObject(br.readLine());
-            br.close();
-            conn.disconnect();
-
-            String status = response.getString("status");
-            if (status.equals("error")) {
-                Log.e("Polling", "Transcript error: " + response.optString("error"));
-                return null;
-            }
-            if (status.equals("completed")) {
-                // ✅ Lấy language_code (auto-detect)
-                String languageCode = response.optString("language_code", "unknown");
-                if (languageCode.equals("null") || languageCode.isEmpty()) {
-                    // Nếu multi: response.getJSONArray("language_codes")
-                    languageCode = "multi";
+            try (Response res = client.newCall(req).execute()) {
+                if (!res.isSuccessful()) {
+                    Log.e(TAG, "poll failed: " + res.code());
+                    return null;
                 }
-                return languageCode;  // Trả về để dùng ở sentences
+                JSONObject j = new JSONObject(res.body().string());
+                String status = j.optString("status", "");
+                if ("completed".equals(status) || "error".equals(status)) {
+                    return j; //  trả về full JSON luôn
+                }
+            } catch (JSONException e) {
+                throw new RuntimeException(e);
             }
-            Thread.sleep(5000);  // Poll every 5s
+            Thread.sleep(delayMs);
         }
+        return null;
     }
 
-    private String getSentences(String transcriptId, String languageCode) throws Exception {
-        URL url = new URL(String.format(SENTENCE_URL, transcriptId));
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestProperty("Authorization", ApiKey.apiKey);
-
-        int responseCode = conn.getResponseCode();
-        if (responseCode != 200) {
-            Log.e("Sentences", "Error code: " + responseCode);
-            return null;
-        }
-
-        BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        JSONObject response = new JSONObject(br.readLine());
-        br.close();
-        conn.disconnect();
-
-        JSONArray sentences = response.getJSONArray("sentences");  // Đúng spec
-        StringBuilder sb = new StringBuilder();
-        sb.append("Language: ").append(languageCode).append("\n\n");  // Thêm language
-
-        for (int i = 0; i < sentences.length(); i++) {
-            JSONObject s = sentences.getJSONObject(i);
-            long start = s.getLong("start");
-            long end = s.getLong("end");
-            String text = s.getString("text");
-            String speaker = s.optString("speaker", "");  // Nếu speaker_labels
-            String channel = s.optString("channel", "");  // Nếu multichannel
-
-            sb.append(String.format("[%d-%d ms]%s%s %s\n",
-                    start, end,
-                    speaker.isEmpty() ? "" : " (Speaker " + speaker + ")",
-                    channel.isEmpty() ? "" : " (Channel " + channel + ")",
-                    text));
-        }
-
-        return sb.toString();
+    private static String formatTimestampRange(long startMs, long endMs) {
+        return formatTimestamp(startMs) + " - " + formatTimestamp(endMs);
     }
+
+    private static String formatTimestamp(long ms) {
+        long totalSec = ms / 1000;
+        long sec = totalSec % 60;
+        long min = (totalSec / 60) % 60;
+        long hr = totalSec / 3600;
+
+        if (hr > 0)
+            return String.format("%d:%02d:%02d", hr, min, sec);
+        else
+            return String.format("%d:%02d", min, sec);
+    }
+
 }
