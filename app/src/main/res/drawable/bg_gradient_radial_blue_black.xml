@@ -12,5 +12,5 @@
     android:gradientRadius="120%p"
     android:useLevel="false" />
 
-    <corners android:radius="0dp" />
+    <corners android:radius="24dp" />
 </shape>
