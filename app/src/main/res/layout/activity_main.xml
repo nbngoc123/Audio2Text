@@ -59,19 +59,24 @@
         android:layout_weight="1"
         android:background="#121212"/>
 
-    <!-- Bottom navigation -->
+    <!-- Bottom Navigation – ĐẶT CUỐI CÙNG TRONG LAYOUT -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:itemIconSize="30dp"
+        android:layout_alignParentBottom="true"
+        android:layout_marginStart="0dp"
+        android:layout_marginEnd="0dp"
+        android:layout_marginBottom="8dp"
+        android:paddingVertical="8dp"
         android:background="@drawable/bg_bottom_nav"
+        app:itemIconSize="26dp"
+        app:itemPadding="0dp"
         app:menu="@menu/bottom_nav_menu"
         app:labelVisibilityMode="labeled"
         app:itemIconTint="@color/nav_item_color"
         app:itemTextColor="@color/nav_item_color"
-
-        />
+        app:elevation="8dp" />
 
 <!--        app:itemIconTint="@color/nav_item_color"-->
 <!--        app:itemTextColor="@color/nav_item_color"-->
