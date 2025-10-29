@@ -9,6 +9,7 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 
 import com.example.audio2text.R;
 import com.example.audio2text.model.TranscriptionRecord;
@@ -41,13 +42,23 @@ public class HistoryAdapter extends ArrayAdapter<TranscriptionRecord> {
         TranscriptionRecord record = records.get(position);
 
         TextView fileName = convertView.findViewById(R.id.fileName);
-        ImageButton btnDelete = convertView.findViewById(R.id.btnDelete);
+        TextView fileDate = convertView.findViewById(R.id.fileDate); // thêm TextView ngày tạo
+//        ImageButton btnDelete = convertView.findViewById(R.id.btnDelete);
 
         fileName.setText(record.getFilename());
+        fileDate.setText(record.getCreatedAt()); // hiển thị ngày tạo
 
-        btnDelete.setOnClickListener(v -> {
-            if (listener != null) listener.onDelete(record);
-        });
+//        btnDelete.setOnClickListener(v -> {
+//            // Hiện AlertDialog xác nhận xóa
+//            new AlertDialog.Builder(context)
+//                    .setTitle("Xác nhận xóa")
+//                    .setMessage("Bạn có chắc muốn xóa file này không?")
+//                    .setPositiveButton("Xóa", (dialog, which) -> {
+//                        if (listener != null) listener.onDelete(record);
+//                    })
+//                    .setNegativeButton("Hủy", null)
+//                    .show();
+//        });
 
         return convertView;
     }

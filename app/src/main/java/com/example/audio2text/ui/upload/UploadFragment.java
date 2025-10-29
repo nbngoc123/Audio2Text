@@ -133,7 +133,6 @@ public class UploadFragment extends Fragment {
         }
     }
 
-    // 🧠 Lấy JSON sentences/utterances từ API
     private String getSentencesJson(String transcriptId) throws Exception {
         String url = String.format("https://api.assemblyai.com/v2/transcript/%s/sentences", transcriptId);
         OkHttpClient client = new OkHttpClient();
