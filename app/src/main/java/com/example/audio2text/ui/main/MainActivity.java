@@ -14,6 +14,7 @@ import com.example.audio2text.ui.detail.DetailFragment;
 import com.example.audio2text.ui.history.HistoryFragment;
 import com.example.audio2text.ui.upload.UploadFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.example.audio2text.ui.convert.ConvertFragment;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -56,7 +57,9 @@ public class MainActivity extends AppCompatActivity {
                 selectedFragment = new UploadFragment();
             } else if (itemId == R.id.nav_profile) {
                 selectedFragment = new ProfileFragment();
-            }
+            } else if (itemId == R.id.nav_convert) { // <--- ĐÂY LÀ ID MỚI CỦA BẠN
+            selectedFragment = new ConvertFragment();
+        }
 
             if (selectedFragment != null) {
                 getSupportFragmentManager()

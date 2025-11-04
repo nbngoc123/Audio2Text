@@ -8,6 +8,11 @@
         android:title="Search"
         android:icon="@drawable/ic_search"/>
 
+    <item
+        android:id="@+id/nav_convert"
+        android:icon="@drawable/ic_upload"
+        android:title="Convert"/>
+
     <item android:id="@+id/nav_upload"
         android:title="Upload"
         android:icon="@drawable/ic_upload"/>

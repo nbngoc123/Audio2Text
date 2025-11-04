@@ -25,8 +25,8 @@ public class SplashActivity extends AppCompatActivity {
 
             Intent intent;
             if (isOnboardingDone) {
-//                intent = new Intent(SplashActivity.this, MainActivity.class);
-                intent = new Intent(SplashActivity.this, OnboardingActivity.class);
+                intent = new Intent(SplashActivity.this, MainActivity.class);
+//                intent = new Intent(SplashActivity.this, OnboardingActivity.class);
 
             } else {
                 intent = new Intent(SplashActivity.this, OnboardingActivity.class);
