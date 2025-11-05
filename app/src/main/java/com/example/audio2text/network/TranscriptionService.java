@@ -53,6 +53,8 @@ public class TranscriptionService {
         JSONObject payload = new JSONObject();
         payload.put("audio_url", audioUrl);
         payload.put("speaker_labels", true); // Bật speaker labels nếu API hỗ trợ
+        payload.put("format_text", true);
+        payload.put("language_detection", true);
 
         RequestBody body = RequestBody.create(payload.toString(), MediaType.parse("application/json"));
         Request req = new Request.Builder()
