@@ -6,6 +6,7 @@ public class TranscriptItem {
     public final long startTimeMs;
     public final long endTimeMs;
     public final String speaker;
+    public boolean timestampLabel;
 
     public TranscriptItem(String label, String text, long startTimeMs, long endTimeMs, String speaker) {
         this.label = label;

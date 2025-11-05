@@ -1,26 +1,82 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:background="@drawable/bg_fragment_1">
+    android:background="@drawable/bg_main_gradient">
 
-    <EditText
-        android:id="@+id/searchBar"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:hint="Tìm kiếm file..."
-        android:paddingHorizontal="12dp"
-        android:background="@drawable/bg_logo_round"
+    <TextView
+        android:id="@+id/tv_history_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="28dp"
+        android:text="Lịch sử"
         android:textColor="@android:color/white"
-        android:textColorHint="#AAAAAA"/>
+        android:textSize="24sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
-    <ListView
-        android:id="@+id/historyList"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:divider="@android:color/darker_gray"
-        android:dividerHeight="0.5dp"
-        android:layout_marginTop="48dp"/>
-</LinearLayout>
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/til_search"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="24dp"
+        android:textColorHint="@android:color/white"
+        app:boxBackgroundColor="#33FFFFFF"
+        app:boxCornerRadiusBottomEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusTopStart="12dp"
+        app:boxStrokeWidth="0dp"
+        app:boxStrokeWidthFocused="0dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tv_history_title"
+        app:startIconDrawable="@drawable/ic_search"
+        app:startIconTint="@android:color/white">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/et_search"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Tìm kiếm file..."
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:textCursorDrawable="@null" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_history"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="16dp"
+        android:clipToPadding="false"
+        android:paddingBottom="16dp"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/til_search"
+        tools:listitem="@layout/item_history" />
+
+    <TextView
+        android:id="@+id/tv_empty_history"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Chưa có bản ghi nào"
+        android:textColor="#B3B3B3"
+        android:textSize="16sp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:visibility="visible" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

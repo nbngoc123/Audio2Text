@@ -1,39 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#121212">
 
+    <!-- Icon Sao chép -->
+    <ImageView
+        android:id="@+id/iv_copy_transcript"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="16dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Sao chép toàn bộ nội dung"
+        android:padding="8dp"
+        android:src="@drawable/ic_copy"
+        app:layout_constraintBottom_toBottomOf="@id/tv_title"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/tv_title"
+        app:tint="@android:color/white" />
+
     <!-- Tiêu đề -->
     <TextView
         android:id="@+id/tv_title"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Transcript with Timestamps"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="28dp"
+        android:layout_marginEnd="8dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center_horizontal"
+        android:maxLines="1"
         android:textColor="#FFFFFF"
         android:textSize="24sp"
-        android:fontFamily="sans-serif-medium"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/iv_copy_transcript"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="28dp" />
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="Tên file rất dài để test" />
 
-    <!-- Mô tả ngắn -->
-<!--    <TextView-->
-<!--        android:id="@+id/tv_subtitle"-->
-<!--        android:layout_width="0dp"-->
-<!--        android:layout_height="wrap_content"-->
-<!--        android:text="No rtaurtler to timetamp, iire's tle Serric. stairs. Tiio to Cooy/relio, Files iuin In inieri."-->
-<!--        android:textColor="#B3B3B3"-->
-<!--        android:textSize="16sp"-->
-<!--        android:gravity="center"-->
-<!--        android:lineSpacingExtra="6dp"-->
-<!--        app:layout_constraintTop_toBottomOf="@id/tv_title"-->
-<!--        app:layout_constraintStart_toStartOf="parent"-->
-<!--        app:layout_constraintEnd_toEndOf="parent"-->
-<!--        android:layout_marginTop="16dp"-->
-<!--        android:layout_marginHorizontal="32dp" />-->
 
     <!-- Danh sách Transcript theo Timestamp -->
     <androidx.recyclerview.widget.RecyclerView
@@ -46,9 +52,12 @@
         app:layout_constraintBottom_toTopOf="@+id/player_container"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tv_title" />
+        app:layout_constraintTop_toBottomOf="@id/tv_title"
+        tools:listitem="@layout/item_transcript_line"/>
 
-    <!-- Player Container (giống hình gốc) -->
+    <!-- =============================================================== -->
+    <!-- NỘI DUNG ĐẦY ĐỦ CỦA PLAYER CONTAINER ĐÃ ĐƯỢC KHÔI PHỤC -->
+    <!-- =============================================================== -->
     <LinearLayout
         android:id="@+id/player_container"
         android:layout_width="0dp"
@@ -82,7 +91,7 @@
                 android:id="@+id/tv_current_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="0:45"
+                android:text="0:00"
                 android:textColor="#FFFFFF"
                 android:textSize="14sp" />
 

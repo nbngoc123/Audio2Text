@@ -1,7 +1,11 @@
 package com.example.audio2text.ui.main;
 
+// Import các thư viện cần thiết
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.database.Cursor;
 import android.media.MediaPlayer;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -9,6 +13,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -25,11 +30,10 @@ import com.example.audio2text.data.db.TranscriptionDatabaseHelper;
 import com.example.audio2text.model.TranscriptItem;
 import com.example.audio2text.model.TranscriptionRecord;
 
-import android.database.Cursor;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainFragment extends Fragment {
+public class DetailFragment extends Fragment {
 
     private static final String ARG_RECORD_ID = "record_id";
     private static final String ARG_TRANSCRIPT = "transcript";
@@ -44,14 +48,17 @@ public class MainFragment extends Fragment {
     private final List<TranscriptItem> transcriptList = new ArrayList<>();
     private TranscriptionDatabaseHelper db;
 
-    // Tạo instance mới với recordId
-    public static MainFragment newInstance(int recordId, String transcript) {
-        MainFragment f = new MainFragment();
+    // Biến cho TextView tiêu đề
+    private TextView tvTitle;
+
+    // Code đã sửa bên trong DetailFragment.java
+    public static DetailFragment newInstance(int recordId, String transcript) {
+        DetailFragment f = new DetailFragment(); // Đảm bảo ở đây là DetailFragment
         Bundle b = new Bundle();
         b.putInt(ARG_RECORD_ID, recordId);
         b.putString(ARG_TRANSCRIPT, transcript);
         f.setArguments(b);
-        return f;
+        return f; // Đảm bảo trả về f, một đối tượng của DetailFragment
     }
 
     @Nullable
@@ -77,6 +84,10 @@ public class MainFragment extends Fragment {
 
         setupControls();
         startPlaybackSync();
+
+        // Xử lý sự kiện click cho nút sao chép
+        ImageView ivCopy = view.findViewById(R.id.iv_copy_transcript);
+        ivCopy.setOnClickListener(v -> copyTranscriptToClipboard());
     }
 
     private void initViews(View view) {
@@ -85,6 +96,8 @@ public class MainFragment extends Fragment {
         tvCurrent = view.findViewById(R.id.tv_current_time);
         tvTotal = view.findViewById(R.id.tv_total_time);
         btnPlay = view.findViewById(R.id.btn_play);
+        // Ánh xạ TextView tiêu đề
+        tvTitle = view.findViewById(R.id.tv_title);
     }
 
     private void setupRecyclerView() {
@@ -106,6 +119,15 @@ public class MainFragment extends Fragment {
             return;
         }
 
+        // ===============================================================
+        // THAY ĐỔI Ở ĐÂY: Lấy tên file từ record.filename
+        // ===============================================================
+        if (record.filename != null && !record.filename.isEmpty()) {
+            tvTitle.setText(record.filename);
+        } else {
+            tvTitle.setText("Chi tiết bản ghi");
+        }
+
         loadSentences(recordId);
         setupMediaPlayer(record.audioUri);
     }
@@ -113,6 +135,15 @@ public class MainFragment extends Fragment {
     private void loadLatestTranscription() {
         TranscriptionRecord latest = db.getLatestRecord();
         if (latest != null) {
+            // ===============================================================
+            // THAY ĐỔI Ở ĐÂY: Lấy tên file từ latest.filename
+            // ===============================================================
+            if (latest.filename != null && !latest.filename.isEmpty()) {
+                tvTitle.setText(latest.filename);
+            } else {
+                tvTitle.setText("Bản ghi mới nhất");
+            }
+
             loadSentences(latest.id);
             setupMediaPlayer(latest.audioUri);
         } else {
@@ -121,6 +152,7 @@ public class MainFragment extends Fragment {
     }
 
     private TranscriptionRecord findRecordById(int recordId) {
+        // Hàm này có thể cần được tối ưu hóa sau này, nhưng hiện tại vẫn hoạt động
         for (TranscriptionRecord r : db.getAllTranscriptions()) {
             if (r.id == recordId) return r;
         }
@@ -148,7 +180,7 @@ public class MainFragment extends Fragment {
     private void setupMediaPlayer(String audioPath) {
         try {
             mediaPlayer = new MediaPlayer();
-            mediaPlayer.setDataSource(audioPath); // đường dẫn tuyệt đối trong files/audio
+            mediaPlayer.setDataSource(audioPath);
             mediaPlayer.prepareAsync();
             mediaPlayer.setOnPreparedListener(mp -> {
                 seekBar.setMax(mediaPlayer.getDuration());
@@ -189,7 +221,6 @@ public class MainFragment extends Fragment {
         }
     }
 
-    // GỘP 2 HANDLER THÀNH 1 → KHÔNG LAG
     private void startPlaybackSync() {
         final Runnable syncRunnable = new Runnable() {
             @Override
@@ -239,6 +270,37 @@ public class MainFragment extends Fragment {
         int m = s / 60;
         s %= 60;
         return String.format("%d:%02d", m, s);
+    }
+
+
+    private void copyTranscriptToClipboard() {
+        String fullText = getFullTranscriptText();
+
+        if (fullText == null || fullText.isEmpty()) {
+            Toast.makeText(getContext(), "Không có nội dung để sao chép", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
+        ClipData clip = ClipData.newPlainText("transcript_text", fullText);
+        clipboard.setPrimaryClip(clip);
+
+        Toast.makeText(getContext(), "Đã sao chép nội dung", Toast.LENGTH_SHORT).show();
+    }
+
+    private String getFullTranscriptText() {
+        if (transcriptList.isEmpty()) {
+            return null;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (TranscriptItem item : transcriptList) {
+            sb.append(item.label)
+                    .append(" ")
+                    .append(item.text)
+                    .append("\n");
+        }
+        return sb.toString();
     }
 
     @Override

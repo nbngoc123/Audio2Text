@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_main_gradient"
+    tools:context=".ui.main.HomeFragment">
+
+    <TextView
+        android:id="@+id/tv_welcome_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginTop="48dp"
+        android:text="Xin chào!"
+        android:textColor="@android:color/white"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/tv_welcome_subtitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Sẵn sàng để chuyển đổi âm thanh của bạn."
+        android:textColor="#E0E1DD"
+        android:textSize="18sp"
+        app:layout_constraintEnd_toEndOf="@id/tv_welcome_title"
+        app:layout_constraintStart_toStartOf="@id/tv_welcome_title"
+        app:layout_constraintTop_toBottomOf="@id/tv_welcome_title" />
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_start_upload"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        app:cardBackgroundColor="#33FFFFFF"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="4dp"
+        app:layout_constraintEnd_toEndOf="@id/tv_welcome_title"
+        app:layout_constraintStart_toStartOf="@id/tv_welcome_title"
+        app:layout_constraintTop_toBottomOf="@id/tv_welcome_subtitle">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="24dp">
+
+            <ImageView
+                android:id="@+id/iv_upload_shortcut"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_upload"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:tint="#0A84FF" />
+
+            <TextView
+                android:id="@+id/tv_upload_shortcut_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="Bắt đầu bản ghi mới"
+                android:textColor="@android:color/white"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toEndOf="@id/iv_upload_shortcut"
+                app:layout_constraintTop_toTopOf="@id/iv_upload_shortcut" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Nhấn để đi đến màn hình Tải lên"
+                android:textColor="#E0E1DD"
+                app:layout_constraintEnd_toEndOf="@id/tv_upload_shortcut_title"
+                app:layout_constraintStart_toStartOf="@id/tv_upload_shortcut_title"
+                app:layout_constraintTop_toBottomOf="@id/tv_upload_shortcut_title" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <TextView
+        android:id="@+id/tv_recent_files_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:text="Các file gần đây"
+        android:textColor="@android:color/white"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        app:layout_constraintStart_toStartOf="@id/tv_welcome_title"
+        app:layout_constraintTop_toBottomOf="@id/card_start_upload" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_recent_history"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="16dp"
+        android:clipToPadding="false"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tv_recent_files_title"
+        tools:itemCount="3"
+        tools:listitem="@layout/item_history" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

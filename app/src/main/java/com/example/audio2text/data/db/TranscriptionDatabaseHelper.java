@@ -17,11 +17,11 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
     private static final int DB_VERSION = 2;
 
     public static final String TABLE_TRANSCRIPTS = "transcripts";
-    public static final String COL_ID = "id";
-    public static final String COL_FILENAME = "filename";
-    public static final String COL_AUDIOURI = "audio_uri";
-    public static final String COL_TRANSCRIPT = "transcript";
-    public static final String COL_CREATED = "created_at";
+    public static final String T_COL_ID = "id";
+    public static final String T_COL_FILENAME = "filename";
+    public static final String T_COL_AUDIO_URI = "audio_uri";
+    public static final String T_COL_TRANSCRIPT = "transcript";
+    public static final String T_COL_CREATED_AT = "created_at";
 
     public static final String TABLE_SENTENCES = "sentences";
     public static final String S_COL_ID = "id";
@@ -38,11 +38,11 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db) {
         String createTranscripts = "CREATE TABLE " + TABLE_TRANSCRIPTS + " (" +
-                COL_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                COL_FILENAME + " TEXT, " +
-                COL_AUDIOURI + " TEXT, " +
-                COL_TRANSCRIPT + " TEXT, " +
-                COL_CREATED + " DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                T_COL_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                T_COL_FILENAME + " TEXT, " +
+                T_COL_AUDIO_URI + " TEXT, " +
+                T_COL_TRANSCRIPT + " TEXT, " +
+                T_COL_CREATED_AT + " DATETIME DEFAULT CURRENT_TIMESTAMP" +
                 ")";
 
         String createSentences = "CREATE TABLE " + TABLE_SENTENCES + " (" +
@@ -52,7 +52,7 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
                 S_COL_START + " INTEGER, " +
                 S_COL_END + " INTEGER, " +
                 S_COL_SPEAKER_LABEL + " TEXT, " +
-                "FOREIGN KEY(" + S_COL_RECORD_ID + ") REFERENCES " + TABLE_TRANSCRIPTS + "(" + COL_ID + ")" +
+                "FOREIGN KEY(" + S_COL_RECORD_ID + ") REFERENCES " + TABLE_TRANSCRIPTS + "(" + T_COL_ID + ")" +
                 ")";
 
         db.execSQL(createTranscripts);
@@ -66,13 +66,12 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
         onCreate(db);
     }
 
-    // Insert transcript -> return inserted rowId
     public long insertTranscript(String filename, String audioUri, String transcript) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues v = new ContentValues();
-        v.put(COL_FILENAME, filename);
-        v.put(COL_AUDIOURI, audioUri);
-        v.put(COL_TRANSCRIPT, transcript);
+        v.put(T_COL_FILENAME, filename);
+        v.put(T_COL_AUDIO_URI, audioUri);
+        v.put(T_COL_TRANSCRIPT, transcript);
         long id = db.insert(TABLE_TRANSCRIPTS, null, v);
         return id;
     }
@@ -88,30 +87,27 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
         db.insert(TABLE_SENTENCES, null, v);
     }
 
-    // Get all transcripts
     public List<TranscriptionRecord> getAllTranscriptions() {
         List<TranscriptionRecord> out = new ArrayList<>();
         SQLiteDatabase db = getReadableDatabase();
-        Cursor c = db.query(TABLE_TRANSCRIPTS, null, null, null, null, null, COL_ID + " DESC");
+        Cursor c = db.query(TABLE_TRANSCRIPTS, null, null, null, null, null, T_COL_ID + " DESC");
 
         if (c != null && c.moveToFirst()) {
             do {
                 TranscriptionRecord r = new TranscriptionRecord(
-                        c.getInt(c.getColumnIndexOrThrow(COL_ID)),
-                        c.getString(c.getColumnIndexOrThrow(COL_FILENAME)),
-                        c.getString(c.getColumnIndexOrThrow(COL_AUDIOURI)),
-                        c.getString(c.getColumnIndexOrThrow(COL_TRANSCRIPT)),
-                        c.getString(c.getColumnIndexOrThrow(COL_CREATED))
+                        c.getInt(c.getColumnIndexOrThrow(T_COL_ID)),
+                        c.getString(c.getColumnIndexOrThrow(T_COL_FILENAME)),
+                        c.getString(c.getColumnIndexOrThrow(T_COL_AUDIO_URI)),
+                        c.getString(c.getColumnIndexOrThrow(T_COL_TRANSCRIPT)),
+                        c.getString(c.getColumnIndexOrThrow(T_COL_CREATED_AT))
                 );
                 out.add(r);
             } while (c.moveToNext());
-            c.close(); // CHỈ ĐÓNG CURSOR
+            c.close();
         }
-        // KHÔNG db.close()
         return out;
     }
 
-    // Get sentences for a record
     public Cursor getSentencesCursor(long recordId) {
         SQLiteDatabase db = getReadableDatabase();
         return db.query(TABLE_SENTENCES, null,
@@ -119,42 +115,38 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
                 null, null, S_COL_START + " ASC");
     }
 
-    // Get latest record
     public TranscriptionRecord getLatestRecord() {
         SQLiteDatabase db = getReadableDatabase();
-        Cursor c = db.query(TABLE_TRANSCRIPTS, null, null, null, null, null, COL_ID + " DESC", "1");
+        Cursor c = db.query(TABLE_TRANSCRIPTS, null, null, null, null, null, T_COL_ID + " DESC", "1");
 
         if (c != null && c.moveToFirst()) {
             TranscriptionRecord r = new TranscriptionRecord(
-                    c.getInt(c.getColumnIndexOrThrow(COL_ID)),
-                    c.getString(c.getColumnIndexOrThrow(COL_FILENAME)),
-                    c.getString(c.getColumnIndexOrThrow(COL_AUDIOURI)),
-                    c.getString(c.getColumnIndexOrThrow(COL_TRANSCRIPT)),
-                    c.getString(c.getColumnIndexOrThrow(COL_CREATED))
+                    c.getInt(c.getColumnIndexOrThrow(T_COL_ID)),
+                    c.getString(c.getColumnIndexOrThrow(T_COL_FILENAME)),
+                    c.getString(c.getColumnIndexOrThrow(T_COL_AUDIO_URI)),
+                    c.getString(c.getColumnIndexOrThrow(T_COL_TRANSCRIPT)),
+                    c.getString(c.getColumnIndexOrThrow(T_COL_CREATED_AT))
             );
             c.close();
-            // KHÔNG db.close()
             return r;
         }
         if (c != null) c.close();
-        // KHÔNG db.close()
         return null;
     }
 
-    // MỚI: Lấy record theo ID (dùng trong MainFragment)
     public TranscriptionRecord getRecordById(int recordId) {
         SQLiteDatabase db = getReadableDatabase();
         Cursor c = db.query(TABLE_TRANSCRIPTS, null,
-                COL_ID + "=?", new String[]{String.valueOf(recordId)},
+                T_COL_ID + "=?", new String[]{String.valueOf(recordId)},
                 null, null, null);
 
         if (c != null && c.moveToFirst()) {
             TranscriptionRecord r = new TranscriptionRecord(
-                    c.getInt(c.getColumnIndexOrThrow(COL_ID)),
-                    c.getString(c.getColumnIndexOrThrow(COL_FILENAME)),
-                    c.getString(c.getColumnIndexOrThrow(COL_AUDIOURI)),
-                    c.getString(c.getColumnIndexOrThrow(COL_TRANSCRIPT)),
-                    c.getString(c.getColumnIndexOrThrow(COL_CREATED))
+                    c.getInt(c.getColumnIndexOrThrow(T_COL_ID)),
+                    c.getString(c.getColumnIndexOrThrow(T_COL_FILENAME)),
+                    c.getString(c.getColumnIndexOrThrow(T_COL_AUDIO_URI)),
+                    c.getString(c.getColumnIndexOrThrow(T_COL_TRANSCRIPT)),
+                    c.getString(c.getColumnIndexOrThrow(T_COL_CREATED_AT))
             );
             c.close();
             return r;
@@ -163,13 +155,33 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
         return null;
     }
 
-    // Xóa một transcript theo ID
     public void deleteTranscript(int id) {
         SQLiteDatabase db = getWritableDatabase();
-        // Xóa luôn các câu liên quan trong bảng sentences
         db.delete(TABLE_SENTENCES, S_COL_RECORD_ID + "=?", new String[]{String.valueOf(id)});
-        // Xóa record chính
-        db.delete(TABLE_TRANSCRIPTS, COL_ID + "=?", new String[]{String.valueOf(id)});
+        db.delete(TABLE_TRANSCRIPTS, T_COL_ID + "=?", new String[]{String.valueOf(id)});
     }
 
+    /**
+     * Phương thức mới để lấy một số lượng giới hạn các bản ghi gần đây nhất.
+     * @param limit Số lượng bản ghi cần lấy.
+     * @return Danh sách các bản ghi.
+     */
+    public List<TranscriptionRecord> getRecentTranscriptions(int limit) {
+        List<TranscriptionRecord> records = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_TRANSCRIPTS, null, null, null, null, null, T_COL_ID + " DESC", String.valueOf(limit));
+
+        if (cursor != null && cursor.moveToFirst()) {
+            do {
+                int id = cursor.getInt(cursor.getColumnIndexOrThrow(T_COL_ID));
+                String filename = cursor.getString(cursor.getColumnIndexOrThrow(T_COL_FILENAME));
+                String audioUri = cursor.getString(cursor.getColumnIndexOrThrow(T_COL_AUDIO_URI));
+                String transcript = cursor.getString(cursor.getColumnIndexOrThrow(T_COL_TRANSCRIPT));
+                String createdAt = cursor.getString(cursor.getColumnIndexOrThrow(T_COL_CREATED_AT));
+                records.add(new TranscriptionRecord(id, filename, audioUri, transcript, createdAt));
+            } while (cursor.moveToNext());
+            cursor.close();
+        }
+        return records;
+    }
 }
