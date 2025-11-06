@@ -96,23 +96,89 @@ public class TranscriptionService {
     public static List<TranscriptItem> parseSentences(String jsonResponse) throws Exception {
         List<TranscriptItem> items = new ArrayList<>();
         JSONObject root = new JSONObject(jsonResponse);
-        JSONArray sentences = root.getJSONArray("sentences");
+        JSONArray sentences = root.optJSONArray("sentences");
+        JSONArray utterances = root.optJSONArray("utterances");
 
-        for (int i = 0; i < sentences.length(); i++) {
-            JSONObject s = sentences.getJSONObject(i);
-            String text = s.getString("text");
-            long start = s.getLong("start");
-            long end = s.getLong("end");
-            String speaker = s.optString("speaker", "A"); // Lấy speaker, mặc định là "A"
-
-            // Tạo label thời gian
-            int s_val = (int) (start / 1000);
-            int m = s_val / 60;
-            s_val %= 60;
-            String label = String.format("%d:%02d", m, s_val);
-
-            items.add(new TranscriptItem(label, text, start, end, speaker));
+        if (utterances != null) {
+            for (int i = 0; i < utterances.length(); i++) {
+                JSONObject u = utterances.getJSONObject(i);
+                String speaker = u.optString("speaker", "A");
+                JSONArray words = u.optJSONArray("words");
+                if (words != null && words.length() > 0) {
+                    long start = words.getJSONObject(0).optLong("start");
+                    long end = words.getJSONObject(words.length() - 1).optLong("end");
+                    StringBuilder sb = new StringBuilder();
+                    for (int j = 0; j < words.length(); j++) {
+                        sb.append(words.getJSONObject(j).optString("text"));
+                        if (j < words.length() - 1) sb.append(" ");
+                    }
+                    items.add(new TranscriptItem(formatTimestampRange(start, end), sb.toString(), start, end, speaker));
+                }
+            }
+        } else if (sentences != null) {
+            for (int i = 0; i < sentences.length(); i++) {
+                JSONObject s = sentences.getJSONObject(i);
+                String text = s.optString("text", "");
+                long start = s.optLong("start");
+                long end = s.optLong("end");
+                String speaker = s.optString("speaker", "A");
+                items.add(new TranscriptItem(formatTimestampRange(start, end), text, start, end, speaker));
+            }
         }
+
+        // Gọi hàm tách câu theo chữ hoa
+        items = splitSentencesByCapital(items);
+
         return items;
     }
+    private static List<TranscriptItem> splitSentencesByCapital(List<TranscriptItem> original) {
+        List<TranscriptItem> result = new ArrayList<>();
+        for (TranscriptItem item : original) {
+            String text = item.text;
+            long start = item.startTimeMs;
+            long end = item.endTimeMs;
+            String speaker = item.speaker;
+
+            if (text.length() > 50) { // chỉ tách nếu câu dài
+                List<String> sentences = new ArrayList<>();
+                int last = 0;
+                for (int i = 1; i < text.length(); i++) {
+                    char c = text.charAt(i);
+                    if (Character.isUpperCase(c) && text.charAt(i - 1) == ' ') {
+                        sentences.add(text.substring(last, i).trim());
+                        last = i;
+                    }
+                }
+                sentences.add(text.substring(last).trim());
+
+                long durationPerSentence = (end - start) / sentences.size();
+                long current = start;
+                for (String s : sentences) {
+                    if (!s.isEmpty()) {
+                        long sentenceEnd = current + durationPerSentence;
+                        result.add(new TranscriptItem(formatTimestampRange(current, sentenceEnd),
+                                s, current, sentenceEnd, speaker));
+                        current = sentenceEnd;
+                    }
+                }
+            } else {
+                result.add(item);
+            }
+        }
+        return result.isEmpty() ? original : result;
+    }
+
+    private static String formatTimestampRange(long startMs, long endMs) {
+        return formatTimestamp(startMs) + " - " + formatTimestamp(endMs);
+    }
+
+    private static String formatTimestamp(long ms) {
+        long sec = (ms / 1000) % 60;
+        long min = (ms / 60000) % 60;
+        long hr = ms / 3600000;
+        if (hr > 0) return String.format("%d:%02d:%02d", hr, min, sec);
+        return String.format("%d:%02d", min, sec);
+    }
+
+
 }
