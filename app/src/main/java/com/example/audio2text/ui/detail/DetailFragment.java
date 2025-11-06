@@ -45,6 +45,8 @@ public class DetailFragment extends Fragment {
     private SeekBar seekBar;
     private TextView tvCurrent, tvTotal;
     private ImageButton btnPlay;
+    private ImageButton btnRewind, btnFastForward;
+
     private final List<TranscriptItem> transcriptList = new ArrayList<>();
     private TranscriptionDatabaseHelper db;
 
@@ -96,8 +98,9 @@ public class DetailFragment extends Fragment {
         tvCurrent = view.findViewById(R.id.tv_current_time);
         tvTotal = view.findViewById(R.id.tv_total_time);
         btnPlay = view.findViewById(R.id.btn_play);
-        // Ánh xạ TextView tiêu đề
         tvTitle = view.findViewById(R.id.tv_title);
+        btnRewind = view.findViewById(R.id.btn_rewind);
+        btnFastForward = view.findViewById(R.id.btn_fast_forward);
     }
 
     private void setupRecyclerView() {
@@ -199,6 +202,21 @@ public class DetailFragment extends Fragment {
     private void setupControls() {
         btnPlay.setOnClickListener(v -> togglePlayPause());
 
+        btnRewind.setOnClickListener(v -> {
+            if (mediaPlayer != null) {
+                int current = mediaPlayer.getCurrentPosition();
+                int newPosition = Math.max(current - 5000, 0);
+                mediaPlayer.seekTo(newPosition);
+            }
+        });
+//        tua tiến
+        btnFastForward.setOnClickListener(v -> {
+            if (mediaPlayer != null) {
+                int current = mediaPlayer.getCurrentPosition();
+                int newPosition = Math.min(current + 5000, mediaPlayer.getDuration());
+                mediaPlayer.seekTo(newPosition);
+            }
+        });
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser && mediaPlayer != null) {
