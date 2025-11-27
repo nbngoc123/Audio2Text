@@ -22,17 +22,12 @@ import com.example.audio2text.R;
 import com.example.audio2text.data.repository.TranscriptionRepository;
 import com.example.audio2text.model.TranscriptItem;
 import com.example.audio2text.network.TranscriptionService;
-import com.example.audio2text.util.ApiKey;
 import com.example.audio2text.util.NetworkUtils;
 import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 
 public class UploadFragment extends Fragment {
 
@@ -41,7 +36,7 @@ public class UploadFragment extends Fragment {
     private Button btnChoose, btnUpload, btnCancel;
     private TextView txtStatus, txtProgressStatus;
     private Uri selectedUri;
-    private File tempFile;
+    private File tempFile; // File này bây giờ sẽ là file được lưu trữ lâu dài
     private LinearLayout layoutButtons, layoutProgress;
 
     private TranscriptionService svc;
@@ -58,16 +53,12 @@ public class UploadFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-
         initViews(view);
-
         svc = new TranscriptionService(requireContext());
         repo = new TranscriptionRepository(requireContext());
-
         btnChoose.setOnClickListener(v -> pickAudio());
         btnUpload.setOnClickListener(v -> startTranscription());
         btnCancel.setOnClickListener(v -> cancelTranscription());
-
         setIdleState();
     }
 
@@ -103,14 +94,11 @@ public class UploadFragment extends Fragment {
             Toast.makeText(getContext(), "Vui lòng chọn một file âm thanh trước", Toast.LENGTH_SHORT).show();
             return;
         }
-
         if (!NetworkUtils.isNetworkAvailable(requireContext())) {
             Toast.makeText(getContext(), "Không có kết nối Internet. Vui lòng thử lại.", Toast.LENGTH_LONG).show();
             return;
         }
-
         setLoadingState();
-
         transcriptionThread = new Thread(() -> {
             try {
                 updateProgressStatus("Chuẩn bị file...");
@@ -136,28 +124,21 @@ public class UploadFragment extends Fragment {
                 JSONObject result = svc.pollForResult(transcriptId, 120, 2000);
                 if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
 
-                if (result == null) {
-                    throw new Exception("Quá thời gian chờ kết quả");
-                }
+                if (result == null) throw new Exception("Quá thời gian chờ kết quả");
 
                 String status = result.optString("status");
-                if ("error".equals(status)) {
-                    throw new Exception("Lỗi xử lý file từ API: " + result.optString("error"));
-                }
-                if (!"completed".equals(status)) {
-                    throw new Exception("Transcript không hoàn tất, trạng thái: " + status);
-                }
+                if ("error".equals(status)) throw new Exception("Lỗi xử lý file từ API: " + result.optString("error"));
+                if (!"completed".equals(status)) throw new Exception("Transcript không hoàn tất, trạng thái: " + status);
 
-                updateProgressStatus("Đang tải câu thoại...");
-                List<TranscriptItem> list = TranscriptionService.parseSentences(getSentencesJson(transcriptId));
+                updateProgressStatus("Đang xử lý kết quả...");
+                List<TranscriptItem> list = TranscriptionService.parseTranscriptFromWords(result.toString());
 
-                saveToDatabase(tempFile.getName(), tempFile.getAbsolutePath(), result.optString("text", ""), list);
+                saveToDatabase(getFileNameFromUri(selectedUri), tempFile.getAbsolutePath(), result.optString("text", ""), list);
 
                 mainHandler.post(() -> {
                     Toast.makeText(requireContext(), "Hoàn tất và đã lưu thành công!", Toast.LENGTH_LONG).show();
                     setIdleState();
                 });
-
             } catch (InterruptedException e) {
                 handleCancellation();
                 Thread.currentThread().interrupt();
@@ -193,11 +174,24 @@ public class UploadFragment extends Fragment {
         txtStatus.setText("Chưa chọn file nào");
         txtStatus.setVisibility(View.VISIBLE);
         layoutProgress.setVisibility(View.GONE);
+
+        // =======================================================
+        // ĐÃ GỠ BỎ LOGIC XÓA FILE Ở ĐÂY
+        // File sẽ được giữ lại để phát ở màn hình chi tiết
+        // =======================================================
+        // if (tempFile != null) {
+        //     tempFile.delete();
+        //     tempFile = null;
+        // }
     }
 
     private void handleCancellation() {
         mainHandler.post(() -> {
             Toast.makeText(getContext(), "Tác vụ đã được hủy", Toast.LENGTH_SHORT).show();
+            // Nếu tác vụ bị hủy, chúng ta nên xóa file đã được sao chép
+            if (tempFile != null) {
+                tempFile.delete();
+            }
             setIdleState();
         });
     }
@@ -208,34 +202,26 @@ public class UploadFragment extends Fragment {
 
     private void showError(String msg) {
         Toast.makeText(getContext(), "Lỗi: " + msg, Toast.LENGTH_LONG).show();
+        // Nếu có lỗi xảy ra, cũng nên xóa file đã được sao chép
+        if (tempFile != null) {
+            tempFile.delete();
+        }
         setIdleState();
     }
 
     private void saveToDatabase(String name, String audioUriString, String fullText, List<TranscriptItem> items) {
         long recId = repo.insertTranscript(name, audioUriString, fullText);
+        if (items == null || items.isEmpty()) {
+            return;
+        }
         for (TranscriptItem it : items) {
             repo.insertSentence(recId, it.text, it.startTimeMs, it.endTimeMs, it.speaker);
         }
     }
 
-    private String getSentencesJson(String transcriptId) throws Exception {
-        String url = String.format("https://api.assemblyai.com/v2/transcript/%s/sentences", transcriptId);
-        OkHttpClient client = new OkHttpClient();
-        String apiKey = ApiKey.getApiKey(requireContext());
-        Request req = new Request.Builder()
-                .url(url)
-                .header("authorization", apiKey)
-                .get()
-                .build();
-        try (Response res = client.newCall(req).execute()) {
-            if (!res.isSuccessful()) throw new IOException("Sentences fetch failed: " + res.code());
-            return res.body().string();
-        }
-    }
-
     private File copyUriToFile(Uri uri) throws Exception {
         String uriName = getFileNameFromUri(uri);
-        if (uriName == null) uriName = "upload_" + System.currentTimeMillis() + ".tmp";
+        if (uriName == null) uriName = "upload_" + System.currentTimeMillis();
         String sanitized = sanitizeFileName(uriName);
         File dir = new File(requireContext().getFilesDir(), "audio");
         if (!dir.exists()) dir.mkdirs();
@@ -276,13 +262,14 @@ public class UploadFragment extends Fragment {
     }
 
     private String sanitizeFileName(String name) {
+        if (name == null) return "temp_audio";
         String base = name.replaceAll("\\.[^.]*$", "");
         String ext = "";
         int dotIndex = name.lastIndexOf('.');
         if (dotIndex != -1) ext = name.substring(dotIndex);
         String normalized = java.text.Normalizer.normalize(base, java.text.Normalizer.Form.NFD);
         String noAccent = normalized.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
-        String clean = noAccent.replaceAll("[^a-zA-Z0-9_-]", "");
+        String clean = noAccent.replaceAll("[^a-zA-Z0-9_-]", "_");
         if (clean.length() > 50) clean = clean.substring(0, 50);
         return clean + ext;
     }
