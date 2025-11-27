@@ -1,35 +1,43 @@
 package com.example.audio2text.network;
 
 import android.content.Context;
-import com.example.audio2text.util.ApiKey; // Import lớp ApiKey
+import com.example.audio2text.util.ApiKey;
+import com.example.audio2text.model.TranscriptItem;
+
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import com.example.audio2text.model.TranscriptItem;
-
+import okhttp3.logging.HttpLoggingInterceptor;
 
 public class TranscriptionService {
 
     private final OkHttpClient client;
-    // 1. Thêm biến Context
     private final Context context;
 
-    // 2. Thêm Constructor để nhận Context
     public TranscriptionService(Context context) {
         this.context = context.getApplicationContext(); // Dùng application context để tránh memory leak
+
+        // Bổ sung Interceptor để log lại request/response mạng, rất hữu ích để gỡ lỗi
+        HttpLoggingInterceptor logging = new HttpLoggingInterceptor();
+        logging.setLevel(HttpLoggingInterceptor.Level.BODY);
+
         this.client = new OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                .addInterceptor(logging) // Thêm interceptor
+                .connectTimeout(60, TimeUnit.SECONDS) // Tăng thời gian chờ
+                .writeTimeout(60, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
                 .build();
     }
 
@@ -37,7 +45,6 @@ public class TranscriptionService {
         RequestBody body = RequestBody.create(file, MediaType.parse("application/octet-stream"));
         Request req = new Request.Builder()
                 .url("https://api.assemblyai.com/v2/upload")
-                // 3. Lấy API Key theo cách mới
                 .header("authorization", ApiKey.getApiKey(context))
                 .post(body)
                 .build();
@@ -52,14 +59,13 @@ public class TranscriptionService {
     public JSONObject createTranscript(String audioUrl) throws Exception {
         JSONObject payload = new JSONObject();
         payload.put("audio_url", audioUrl);
-        payload.put("speaker_labels", true); // Bật speaker labels nếu API hỗ trợ
-        payload.put("format_text", true);
+        payload.put("speaker_labels", true);
+        payload.put("format_text", true); // Bật định dạng văn bản (dấu câu, viết hoa)
         payload.put("language_detection", true);
 
         RequestBody body = RequestBody.create(payload.toString(), MediaType.parse("application/json"));
         Request req = new Request.Builder()
                 .url("https://api.assemblyai.com/v2/transcript")
-                // 3. Lấy API Key theo cách mới
                 .header("authorization", ApiKey.getApiKey(context))
                 .post(body)
                 .build();
@@ -75,7 +81,6 @@ public class TranscriptionService {
         while (System.currentTimeMillis() - start < maxWaitSecs * 1000) {
             Request req = new Request.Builder()
                     .url("https://api.assemblyai.com/v2/transcript/" + transcriptId)
-                    // 3. Lấy API Key theo cách mới
                     .header("authorization", ApiKey.getApiKey(context))
                     .get()
                     .build();
@@ -93,92 +98,84 @@ public class TranscriptionService {
         return null;
     }
 
-    public static List<TranscriptItem> parseSentences(String jsonResponse) throws Exception {
+    /**
+     * PHƯƠNG THỨC MỚI VÀ ĐÚNG ĐỂ XỬ LÝ KẾT QUẢ TỪ ASSEMBLYAI
+     * Phương thức này sẽ duyệt qua mảng "words" (từng từ) mà API trả về,
+     * sau đó nhóm chúng lại thành các câu dựa trên khoảng lặng và dấu câu.
+     *
+     * @param jsonResponse Chuỗi JSON nhận được khi phiên âm hoàn tất.
+     * @return Một danh sách các đối tượng TranscriptItem, mỗi đối tượng là một câu hoàn chỉnh.
+     * @throws JSONException
+     */
+    public static List<TranscriptItem> parseTranscriptFromWords(String jsonResponse) throws JSONException {
         List<TranscriptItem> items = new ArrayList<>();
         JSONObject root = new JSONObject(jsonResponse);
-        JSONArray sentences = root.optJSONArray("sentences");
-        JSONArray utterances = root.optJSONArray("utterances");
 
-        if (utterances != null) {
-            for (int i = 0; i < utterances.length(); i++) {
-                JSONObject u = utterances.getJSONObject(i);
-                String speaker = u.optString("speaker", "A");
-                JSONArray words = u.optJSONArray("words");
-                if (words != null && words.length() > 0) {
-                    long start = words.getJSONObject(0).optLong("start");
-                    long end = words.getJSONObject(words.length() - 1).optLong("end");
-                    StringBuilder sb = new StringBuilder();
-                    for (int j = 0; j < words.length(); j++) {
-                        sb.append(words.getJSONObject(j).optString("text"));
-                        if (j < words.length() - 1) sb.append(" ");
-                    }
-                    items.add(new TranscriptItem(formatTimestampRange(start, end), sb.toString(), start, end, speaker));
-                }
-            }
-        } else if (sentences != null) {
-            for (int i = 0; i < sentences.length(); i++) {
-                JSONObject s = sentences.getJSONObject(i);
-                String text = s.optString("text", "");
-                long start = s.optLong("start");
-                long end = s.optLong("end");
-                String speaker = s.optString("speaker", "A");
-                items.add(new TranscriptItem(formatTimestampRange(start, end), text, start, end, speaker));
-            }
+        // Kiểm tra xem kết quả có chứa mảng 'words' không
+        if (!root.has("words")) {
+            return items; // Trả về danh sách rỗng nếu không có
         }
 
-        // Gọi hàm tách câu theo chữ hoa
-        items = splitSentencesByCapital(items);
+        JSONArray words = root.getJSONArray("words");
+        if (words.length() == 0) {
+            return items;
+        }
 
+        // Ngưỡng thời gian (mili giây) để coi là một khoảng nghỉ giữa các câu.
+        final long SENTENCE_PAUSE_THRESHOLD_MS = 500;
+        StringBuilder sentenceBuilder = new StringBuilder();
+
+        // Thời gian bắt đầu của câu hiện tại là thời gian bắt đầu của từ đầu tiên.
+        long sentenceStartTime = words.getJSONObject(0).getLong("start");
+        String currentSpeaker = words.getJSONObject(0).optString("speaker", "A");
+
+        for (int i = 0; i < words.length(); i++) {
+            JSONObject currentWord = words.getJSONObject(i);
+            String text = currentWord.getString("text");
+            long endTime = currentWord.getLong("end");
+            String speaker = currentWord.optString("speaker", "A");
+
+            sentenceBuilder.append(text).append(" ");
+
+            boolean isLastWord = (i == words.length() - 1);
+            boolean shouldBreakSentence = false;
+
+            if (!isLastWord) {
+                JSONObject nextWord = words.getJSONObject(i + 1);
+                long nextStartTime = nextWord.getLong("start");
+                long pauseDuration = nextStartTime - endTime;
+                String nextSpeaker = nextWord.optString("speaker", "A");
+
+                // Điều kiện 1: Khoảng lặng giữa 2 từ đủ lớn
+                if (pauseDuration >= SENTENCE_PAUSE_THRESHOLD_MS) {
+                    shouldBreakSentence = true;
+                }
+
+                // Điều kiện 2: Người nói thay đổi
+                if (!speaker.equals(nextSpeaker)) {
+                    shouldBreakSentence = true;
+                }
+            }
+
+            // Nếu là từ cuối cùng HOẶC đủ điều kiện ngắt câu thì tạo thành một TranscriptItem
+            if (isLastWord || shouldBreakSentence) {
+                // Tạo label thời gian dạng "phút:giây"
+                int totalSeconds = (int) (sentenceStartTime / 1000);
+                int minutes = totalSeconds / 60;
+                int seconds = totalSeconds % 60;
+                String label = String.format("%d:%02d", minutes, seconds);
+
+                // Thêm câu hoàn chỉnh vào danh sách kết quả
+                items.add(new TranscriptItem(label, sentenceBuilder.toString().trim(), sentenceStartTime, endTime, currentSpeaker));
+
+                // Reset các biến để chuẩn bị cho câu tiếp theo
+                sentenceBuilder.setLength(0);
+                if (!isLastWord) {
+                    sentenceStartTime = words.getJSONObject(i + 1).getLong("start");
+                    currentSpeaker = words.getJSONObject(i + 1).optString("speaker", "A");
+                }
+            }
+        }
         return items;
     }
-    private static List<TranscriptItem> splitSentencesByCapital(List<TranscriptItem> original) {
-        List<TranscriptItem> result = new ArrayList<>();
-        for (TranscriptItem item : original) {
-            String text = item.text;
-            long start = item.startTimeMs;
-            long end = item.endTimeMs;
-            String speaker = item.speaker;
-
-            if (text.length() > 50) { // chỉ tách nếu câu dài
-                List<String> sentences = new ArrayList<>();
-                int last = 0;
-                for (int i = 1; i < text.length(); i++) {
-                    char c = text.charAt(i);
-                    if (Character.isUpperCase(c) && text.charAt(i - 1) == ' ') {
-                        sentences.add(text.substring(last, i).trim());
-                        last = i;
-                    }
-                }
-                sentences.add(text.substring(last).trim());
-
-                long durationPerSentence = (end - start) / sentences.size();
-                long current = start;
-                for (String s : sentences) {
-                    if (!s.isEmpty()) {
-                        long sentenceEnd = current + durationPerSentence;
-                        result.add(new TranscriptItem(formatTimestampRange(current, sentenceEnd),
-                                s, current, sentenceEnd, speaker));
-                        current = sentenceEnd;
-                    }
-                }
-            } else {
-                result.add(item);
-            }
-        }
-        return result.isEmpty() ? original : result;
-    }
-
-    private static String formatTimestampRange(long startMs, long endMs) {
-        return formatTimestamp(startMs) + " - " + formatTimestamp(endMs);
-    }
-
-    private static String formatTimestamp(long ms) {
-        long sec = (ms / 1000) % 60;
-        long min = (ms / 60000) % 60;
-        long hr = ms / 3600000;
-        if (hr > 0) return String.format("%d:%02d:%02d", hr, min, sec);
-        return String.format("%d:%02d", min, sec);
-    }
-
-
 }
