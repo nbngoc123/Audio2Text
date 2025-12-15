@@ -8,6 +8,7 @@ import androidx.fragment.app.Fragment;
 import com.example.audio2text.R;
 import com.example.audio2text.ui.history.HistoryFragment;
 import com.example.audio2text.ui.upload.UploadFragment;
+import com.example.audio2text.ui.vietsub.VietsubFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.example.audio2text.ui.convert.ConvertFragment;
 
@@ -43,9 +44,9 @@ public class MainActivity extends AppCompatActivity implements NavigationListene
                 selectedFragment = new HistoryFragment();
             } else if (itemId == R.id.nav_upload) {
                 selectedFragment = new UploadFragment();
-            } else if (itemId == R.id.nav_profile) {
-                selectedFragment = new ProfileFragment();
-            } else if (itemId == R.id.nav_convert) { // <--- ĐÂY LÀ ID MỚI CỦA BẠN
+            } else if (itemId == R.id.nav_vietsub) {
+                selectedFragment = new VietsubFragment();
+            } else if (itemId == R.id.nav_convert) {
             selectedFragment = new ConvertFragment();
         }
 
