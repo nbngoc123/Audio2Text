@@ -123,7 +123,7 @@ public class UploadFragment extends Fragment {
 
                 if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
                 updateProgressStatus("Tạo transcript...");
-                JSONObject createRes = svc.createTranscript(uploadUrl);
+                JSONObject createRes = svc.createTranscript(uploadUrl, "vi", false);
                 String transcriptId = createRes.optString("id");
                 if (transcriptId.isEmpty()) {
                     String error = createRes.optString("error");
@@ -149,8 +149,7 @@ public class UploadFragment extends Fragment {
                 }
 
                 updateProgressStatus("Đang tải câu thoại...");
-                List<TranscriptItem> list = TranscriptionService.parseSentences(getSentencesJson(transcriptId));
-
+                List<TranscriptItem> list = TranscriptionService.parseSentences(result.toString());
                 saveToDatabase(tempFile.getName(), tempFile.getAbsolutePath(), result.optString("text", ""), list);
 
                 mainHandler.post(() -> {
@@ -218,20 +217,6 @@ public class UploadFragment extends Fragment {
         }
     }
 
-    private String getSentencesJson(String transcriptId) throws Exception {
-        String url = String.format("https://api.assemblyai.com/v2/transcript/%s/sentences", transcriptId);
-        OkHttpClient client = new OkHttpClient();
-        String apiKey = ApiKey.getApiKey(requireContext());
-        Request req = new Request.Builder()
-                .url(url)
-                .header("authorization", apiKey)
-                .get()
-                .build();
-        try (Response res = client.newCall(req).execute()) {
-            if (!res.isSuccessful()) throw new IOException("Sentences fetch failed: " + res.code());
-            return res.body().string();
-        }
-    }
 
     private File copyUriToFile(Uri uri) throws Exception {
         String uriName = getFileNameFromUri(uri);

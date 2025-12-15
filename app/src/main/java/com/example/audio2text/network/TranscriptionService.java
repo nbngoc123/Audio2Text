@@ -1,6 +1,8 @@
 package com.example.audio2text.network;
 
 import android.content.Context;
+import android.util.Log;
+
 import com.example.audio2text.util.ApiKey; // Import lớp ApiKey
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -49,12 +51,23 @@ public class TranscriptionService {
         }
     }
 
-    public JSONObject createTranscript(String audioUrl) throws Exception {
+    public JSONObject createTranscript(String audioUrl, String languageCode, Boolean speakerLabels) throws Exception {
         JSONObject payload = new JSONObject();
         payload.put("audio_url", audioUrl);
-        payload.put("speaker_labels", true); // Bật speaker labels nếu API hỗ trợ
         payload.put("format_text", true);
-        payload.put("language_detection", true);
+        payload.put("punctuate", true);
+        //  tra ngôn ngữ đầu vào
+        if (languageCode != null && !languageCode.isEmpty() && !languageCode.equals("auto")) {
+            payload.put("language_code", languageCode);
+            payload.put("language_detection", false);
+        } else {
+            payload.put("language_detection", true);
+        }
+        //  tra speaker đầu vào
+        if (speakerLabels != null) {
+            payload.put("speaker_labels", speakerLabels);
+        }
+
 
         RequestBody body = RequestBody.create(payload.toString(), MediaType.parse("application/json"));
         Request req = new Request.Builder()
@@ -94,78 +107,110 @@ public class TranscriptionService {
     }
 
     public static List<TranscriptItem> parseSentences(String jsonResponse) throws Exception {
+        final String TAG = "ParseDebug";
+        Log.d(TAG, "--- BẮT ĐẦU PHÂN TÍCH JSON ---");
+
         List<TranscriptItem> items = new ArrayList<>();
         JSONObject root = new JSONObject(jsonResponse);
-        JSONArray sentences = root.optJSONArray("sentences");
-        JSONArray utterances = root.optJSONArray("utterances");
 
-        if (utterances != null) {
-            for (int i = 0; i < utterances.length(); i++) {
-                JSONObject u = utterances.getJSONObject(i);
-                String speaker = u.optString("speaker", "A");
-                JSONArray words = u.optJSONArray("words");
-                if (words != null && words.length() > 0) {
-                    long start = words.getJSONObject(0).optLong("start");
-                    long end = words.getJSONObject(words.length() - 1).optLong("end");
-                    StringBuilder sb = new StringBuilder();
-                    for (int j = 0; j < words.length(); j++) {
-                        sb.append(words.getJSONObject(j).optString("text"));
-                        if (j < words.length() - 1) sb.append(" ");
-                    }
-                    items.add(new TranscriptItem(formatTimestampRange(start, end), sb.toString(), start, end, speaker));
-                }
+        JSONArray words = root.optJSONArray("words");
+
+        if (words == null || words.length() == 0) {
+            Log.e(TAG, "Lỗi: Mảng 'words' bị null hoặc rỗng!");
+            return items;
+        }
+
+        Log.d(TAG, "Tìm thấy tổng cộng: " + words.length() + " từ.");
+
+        StringBuilder currentSentenceText = new StringBuilder();
+        long currentSentenceStart = -1;
+        long currentSentenceEnd = -1;
+
+        for (int i = 0; i < words.length(); i++) {
+            JSONObject w = words.getJSONObject(i);
+            String wordText = w.optString("text");
+            long start = w.optLong("start");
+            long end = w.optLong("end");
+
+            // Log từng từ (Nếu nhiều quá có thể comment lại)
+            // Log.v(TAG, String.format("Word[%d]: %s (%d - %d)", i, wordText, start, end));
+
+            // Logic kiểm tra viết hoa
+            boolean isCapital = !wordText.isEmpty() && Character.isUpperCase(wordText.charAt(0));
+            boolean hasContent = currentSentenceText.length() > 0;
+
+            // 1. NGẮT CÂU DO VIẾT HOA
+            if (hasContent && isCapital) {
+                Log.d(TAG, ">>> NGẮT CÂU (Lý do: Chữ hoa): Gặp từ '" + wordText + "'");
+
+                String sentence = currentSentenceText.toString().trim();
+                Log.d(TAG, "   + Lưu câu: [" + sentence + "]");
+                Log.d(TAG, "   + Thời gian: " + currentSentenceStart + " -> " + currentSentenceEnd);
+
+                items.add(new TranscriptItem(
+                        formatTimestampRange(currentSentenceStart, currentSentenceEnd),
+                        sentence,
+                        currentSentenceStart,
+                        currentSentenceEnd,
+                        "A"
+                ));
+
+                // Reset
+                currentSentenceText.setLength(0);
+                currentSentenceStart = -1;
             }
-        } else if (sentences != null) {
-            for (int i = 0; i < sentences.length(); i++) {
-                JSONObject s = sentences.getJSONObject(i);
-                String text = s.optString("text", "");
-                long start = s.optLong("start");
-                long end = s.optLong("end");
-                String speaker = s.optString("speaker", "A");
-                items.add(new TranscriptItem(formatTimestampRange(start, end), text, start, end, speaker));
+
+            // 2. GHÉP TỪ
+            if (currentSentenceText.length() > 0) {
+                currentSentenceText.append(" ");
+            }
+            currentSentenceText.append(wordText);
+
+            // Cập nhật thời gian
+            if (currentSentenceStart == -1) {
+                currentSentenceStart = start; // Set thời gian bắt đầu câu
+            }
+            currentSentenceEnd = end; // Luôn cập nhật thời gian kết thúc mới nhất
+
+            // 3. NGẮT CÂU DO DẤU CÂU (., ?, !)
+            if (wordText.endsWith(".") || wordText.endsWith("?") || wordText.endsWith("!")) {
+                Log.d(TAG, ">>> NGẮT CÂU (Lý do: Dấu câu): Tại từ '" + wordText + "'");
+
+                String sentence = currentSentenceText.toString().trim();
+                Log.d(TAG, "   + Lưu câu: [" + sentence + "]");
+                Log.d(TAG, "   + Thời gian: " + currentSentenceStart + " -> " + currentSentenceEnd);
+
+                items.add(new TranscriptItem(
+                        formatTimestampRange(currentSentenceStart, currentSentenceEnd),
+                        sentence,
+                        currentSentenceStart,
+                        currentSentenceEnd,
+                        "A"
+                ));
+
+                // Reset
+                currentSentenceText.setLength(0);
+                currentSentenceStart = -1;
             }
         }
 
-        // Gọi hàm tách câu theo chữ hoa
-        items = splitSentencesByCapital(items);
+        // 4. XỬ LÝ PHẦN CÒN DƯ (Sentence cuối cùng chưa kịp ngắt)
+        if (currentSentenceText.length() > 0) {
+            Log.d(TAG, ">>> LƯU CÂU CUỐI CÙNG (Kết thúc mảng words)");
+            String sentence = currentSentenceText.toString().trim();
+            Log.d(TAG, "   + Lưu câu: [" + sentence + "]");
 
+            items.add(new TranscriptItem(
+                    formatTimestampRange(currentSentenceStart, currentSentenceEnd),
+                    sentence,
+                    currentSentenceStart,
+                    currentSentenceEnd,
+                    "A"
+            ));
+        }
+
+        Log.d(TAG, "--- KẾT THÚC: Tạo được " + items.size() + " câu thoại ---");
         return items;
-    }
-    private static List<TranscriptItem> splitSentencesByCapital(List<TranscriptItem> original) {
-        List<TranscriptItem> result = new ArrayList<>();
-        for (TranscriptItem item : original) {
-            String text = item.text;
-            long start = item.startTimeMs;
-            long end = item.endTimeMs;
-            String speaker = item.speaker;
-
-            if (text.length() > 50) { // chỉ tách nếu câu dài
-                List<String> sentences = new ArrayList<>();
-                int last = 0;
-                for (int i = 1; i < text.length(); i++) {
-                    char c = text.charAt(i);
-                    if (Character.isUpperCase(c) && text.charAt(i - 1) == ' ') {
-                        sentences.add(text.substring(last, i).trim());
-                        last = i;
-                    }
-                }
-                sentences.add(text.substring(last).trim());
-
-                long durationPerSentence = (end - start) / sentences.size();
-                long current = start;
-                for (String s : sentences) {
-                    if (!s.isEmpty()) {
-                        long sentenceEnd = current + durationPerSentence;
-                        result.add(new TranscriptItem(formatTimestampRange(current, sentenceEnd),
-                                s, current, sentenceEnd, speaker));
-                        current = sentenceEnd;
-                    }
-                }
-            } else {
-                result.add(item);
-            }
-        }
-        return result.isEmpty() ? original : result;
     }
 
     private static String formatTimestampRange(long startMs, long endMs) {

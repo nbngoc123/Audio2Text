@@ -12,8 +12,10 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -51,7 +53,7 @@ public class VietsubFragment extends Fragment {
     private TranscriptionService svc;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private volatile Thread processThread;
-
+    private Spinner spinnerLanguage;
     private final ActivityResultLauncher<Intent> pickVideoLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -77,11 +79,12 @@ public class VietsubFragment extends Fragment {
         btnProcess = view.findViewById(R.id.btnProcess);
         txtStatus = view.findViewById(R.id.txtStatus);
         progressBar = view.findViewById(R.id.progressBar);
-
+        spinnerLanguage = view.findViewById(R.id.spinnerLanguage);
         svc = new TranscriptionService(requireContext());
 
         btnChooseVideo.setOnClickListener(v -> pickVideo());
         btnProcess.setOnClickListener(v -> startVietsubProcess());
+        setupLanguageSpinner();
     }
 
     private void pickVideo() {
@@ -90,6 +93,28 @@ public class VietsubFragment extends Fragment {
         pickVideoLauncher.launch(Intent.createChooser(intent, "Chọn Video MP4"));
     }
 
+    // Hàm cài đặt Spinner
+    private void setupLanguageSpinner() {
+        // Danh sách hiển thị cho người dùng
+        String[] languages = {"Tự động (Auto)", "Tiếng Việt", "Tiếng Anh (English)", "Tiếng Nhật", "Tiếng Hàn"};
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, languages);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        spinnerLanguage.setAdapter(adapter);
+    }
+    // Hàm phụ trợ để lấy mã code từ lựa chọn
+    private String getSelectedLanguageCode() {
+        int position = spinnerLanguage.getSelectedItemPosition();
+        switch (position) {
+            case 0: return "auto"; // Tự động
+            case 1: return "vi";   // Tiếng Việt
+            case 2: return "en";   // Tiếng Anh
+            case 3: return "ja";   // Tiếng Nhật
+            case 4: return "ko";   // Tiếng Hàn
+            default: return "auto";
+        }
+    }
     private void startVietsubProcess() {
         if (selectedUri == null) return;
         setupFont();
@@ -108,8 +133,9 @@ public class VietsubFragment extends Fragment {
                 updateStatus("Đang tải lên server...");
                 String uploadUrl = svc.uploadFile(audioFile);
 
+                String langCode = getSelectedLanguageCode();
                 updateStatus("Đang phân tích giọng nói...");
-                JSONObject createRes = svc.createTranscript(uploadUrl);
+                JSONObject createRes = svc.createTranscript(uploadUrl, langCode, false);
                 String transcriptId = createRes.optString("id");
 
                 if (transcriptId.isEmpty()) throw new Exception("Không lấy được ID transcript");
@@ -125,8 +151,7 @@ public class VietsubFragment extends Fragment {
                 // 6. Lấy câu thoại
                 updateStatus("Đang tải phụ đề...");
                 String sentencesJson = getSentencesJson(transcriptId);
-                List<TranscriptItem> transcripts = TranscriptionService.parseSentences(sentencesJson);
-
+                List<TranscriptItem> transcripts = TranscriptionService.parseSentences(result.toString());
                 // 7. Tạo file SRT
                 updateStatus("Đang tạo file phụ đề...");
                 File srtFile = SubtitleUtils.createSrtFile(transcripts, requireContext().getCacheDir());
@@ -165,7 +190,11 @@ public class VietsubFragment extends Fragment {
     }
 
     private File extractAudioFromVideo(File videoFile) throws Exception {
-        File outputAudio = new File(requireContext().getCacheDir(), "extracted_audio.mp3");
+//        File outputAudio = new File(requireContext().getCacheDir(), "extracted_audio.mp3");
+        File outputAudio = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "extracted_audio_TEST.mp3");
+
+        // Xóa file cũ trước khi tách
+        if (outputAudio.exists()) outputAudio.delete();
 
         // Cú pháp FFmpegKit: -y (ghi đè) -i (input) -vn (bỏ video) -acodec (codec âm thanh)
         String cmd = String.format("-y -i \"%s\" -vn -acodec libmp3lame \"%s\"",
