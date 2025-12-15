@@ -14,6 +14,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -24,12 +25,16 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import com.example.audio2text.util.TranslateTranscripts;
 
 // --- IMPORT CHUẨN CỦA FFMPEG-KIT ---
 import com.arthenica.ffmpegkit.FFmpegKit;
 import com.arthenica.ffmpegkit.FFmpegSession;
 import com.arthenica.ffmpegkit.ReturnCode;
 import com.arthenica.ffmpegkit.SessionState;
+
+import com.google.mlkit.nl.translate.TranslateLanguage;
+
 
 import com.example.audio2text.R;
 import com.example.audio2text.model.TranscriptItem;
@@ -53,7 +58,8 @@ public class VietsubFragment extends Fragment {
     private TranscriptionService svc;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private volatile Thread processThread;
-    private Spinner spinnerLanguage;
+    private Spinner spinnerLanguage, spinnerTargetLanguage;
+    private CheckBox cbExportSrt;
     private final ActivityResultLauncher<Intent> pickVideoLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -80,6 +86,8 @@ public class VietsubFragment extends Fragment {
         txtStatus = view.findViewById(R.id.txtStatus);
         progressBar = view.findViewById(R.id.progressBar);
         spinnerLanguage = view.findViewById(R.id.spinnerLanguage);
+        spinnerTargetLanguage = view.findViewById(R.id.spinnerTargetLanguage);
+        cbExportSrt = view.findViewById(R.id.cbExportSrt);
         svc = new TranscriptionService(requireContext());
 
         btnChooseVideo.setOnClickListener(v -> pickVideo());
@@ -95,24 +103,40 @@ public class VietsubFragment extends Fragment {
 
     // Hàm cài đặt Spinner
     private void setupLanguageSpinner() {
-        // Danh sách hiển thị cho người dùng
-        String[] languages = {"Tự động (Auto)", "Tiếng Việt", "Tiếng Anh (English)", "Tiếng Nhật", "Tiếng Hàn"};
+        // Setup Spinner Nguồn (Source)
+        String[] sourceLangs = {"Tự động (Auto)", "Tiếng Việt", "Tiếng Anh", "Tiếng Nhật"};
+        ArrayAdapter<String> adapterSrc = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, sourceLangs);
+        adapterSrc.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerLanguage.setAdapter(adapterSrc);
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, languages);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-
-        spinnerLanguage.setAdapter(adapter);
+        // Setup Spinner Đích (Target) - Thêm tùy chọn "Giữ nguyên"
+        String[] targetLangs = {"Giữ nguyên (Không dịch)", "Tiếng Việt", "Tiếng Anh", "Tiếng Nhật", "Tiếng Hàn"};
+        ArrayAdapter<String> adapterTarget = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, targetLangs);
+        adapterTarget.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerTargetLanguage.setAdapter(adapterTarget);
     }
     // Hàm phụ trợ để lấy mã code từ lựa chọn
     private String getSelectedLanguageCode() {
         int position = spinnerLanguage.getSelectedItemPosition();
         switch (position) {
-            case 0: return "auto"; // Tự động
-            case 1: return "vi";   // Tiếng Việt
-            case 2: return "en";   // Tiếng Anh
-            case 3: return "ja";   // Tiếng Nhật
-            case 4: return "ko";   // Tiếng Hàn
+            case 0: return "auto";
+            case 1: return "vi";
+            case 2: return "en";
+            case 3: return "ja";
+            case 4: return "ko";
             default: return "auto";
+        }
+    }
+
+    // Helper lấy mã ngôn ngữ đích cho ML Kit
+    private String getTargetLangCodeForMLKit() {
+        int pos = spinnerTargetLanguage.getSelectedItemPosition();
+        switch (pos) {
+            case 1: return TranslateLanguage.VIETNAMESE;
+            case 2: return TranslateLanguage.ENGLISH;
+            case 3: return TranslateLanguage.JAPANESE;
+            case 4: return TranslateLanguage.KOREAN;
+            default: return null;
         }
     }
     private void startVietsubProcess() {
@@ -152,6 +176,21 @@ public class VietsubFragment extends Fragment {
                 updateStatus("Đang tải phụ đề...");
                 String sentencesJson = getSentencesJson(transcriptId);
                 List<TranscriptItem> transcripts = TranscriptionService.parseSentences(result.toString());
+                // --- LOGIC DỊCH THUẬT MỚI ---
+                String targetLang = getTargetLangCodeForMLKit();
+
+                String detectedLang = result.optString("language_code", "en");
+
+                if (targetLang != null) {
+                    // Gọi hàm static từ Translation Utils
+                    // Truyền vào 'msg -> updateStatus(msg)' để Util có thể cập nhật Text trên màn hình
+                    transcripts = TranslateTranscripts.translateList(
+                            transcripts,
+                            targetLang,
+                            detectedLang,
+                            msg -> updateStatus(msg) // Callback cập nhật UI
+                    );
+                }
                 // 7. Tạo file SRT
                 updateStatus("Đang tạo file phụ đề...");
                 File srtFile = SubtitleUtils.createSrtFile(transcripts, requireContext().getCacheDir());
@@ -159,7 +198,15 @@ public class VietsubFragment extends Fragment {
                 if (transcripts.isEmpty()) {
                     mainHandler.post(() -> Toast.makeText(getContext(), "Cảnh báo: AI không tìm thấy giọng nói nào!", Toast.LENGTH_LONG).show());
                 }
-                // 8. Gắn Sub vào Video (QUAN TRỌNG: Code FFmpegKit mới)
+
+                // --- LOGIC XUẤT FILE ---
+                if (cbExportSrt.isChecked()) {
+                    updateStatus("Đang xuất file SRT...");
+                    exportSrtToPublic(srtFile);
+                }
+                // ---------------------------
+
+                // 8. Gắn Sub vào Video
                 updateStatus("Đang gắn phụ đề vào video...");
                 burnSubtitles(inputVideoFile, srtFile);
 
@@ -330,4 +377,32 @@ public class VietsubFragment extends Fragment {
         // Cần import com.arthenica.ffmpegkit.FFmpegKitConfig;
         com.arthenica.ffmpegkit.FFmpegKitConfig.setFontDirectory(requireContext(), fontDir.getAbsolutePath(), null);
     }
+
+
+    private void exportSrtToPublic(File internalSrtFile) {
+        // Dùng MediaStore để lưu file text vào thư mục Documents/Downloads
+        android.content.ContentValues values = new android.content.ContentValues();
+        values.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, "Subtitle_" + System.currentTimeMillis() + ".srt");
+        values.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "text/plain"); // Hoặc application/x-subrip
+        values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOCUMENTS);
+
+        try {
+            Uri uri = requireContext().getContentResolver().insert(android.provider.MediaStore.Files.getContentUri("external"), values);
+            if (uri != null) {
+                try (java.io.OutputStream out = requireContext().getContentResolver().openOutputStream(uri);
+                     java.io.FileInputStream in = new java.io.FileInputStream(internalSrtFile)) {
+                    byte[] buf = new byte[1024];
+                    int len;
+                    while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
+
+                    mainHandler.post(() -> Toast.makeText(getContext(), "Đã lưu file SRT vào thư mục Documents!", Toast.LENGTH_LONG).show());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            mainHandler.post(() -> Toast.makeText(getContext(), "Lỗi lưu SRT: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+        }
+    }
+
+
 }
