@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="#121212">
 
-    <!-- Icon Sao chép -->
+    <!-- Icon Sao chép (GIỮ NGUYÊN) -->
     <ImageView
         android:id="@+id/iv_copy_transcript"
         android:layout_width="40dp"
@@ -21,7 +21,7 @@
         app:layout_constraintTop_toTopOf="@id/tv_title"
         app:tint="@android:color/white" />
 
-    <!-- Tiêu đề -->
+    <!-- Tiêu đề (GIỮ NGUYÊN) -->
     <TextView
         android:id="@+id/tv_title"
         android:layout_width="0dp"
@@ -41,7 +41,7 @@
         tools:text="Tên file rất dài để test" />
 
 
-    <!-- Danh sách Transcript theo Timestamp -->
+    <!-- Danh sách Transcript (GIỮ NGUYÊN) -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_transcript"
         android:layout_width="0dp"
@@ -55,9 +55,25 @@
         app:layout_constraintTop_toBottomOf="@id/tv_title"
         tools:listitem="@layout/item_transcript_line"/>
 
-    <!-- =============================================================== -->
-    <!-- NỘI DUNG ĐẦY ĐỦ CỦA PLAYER CONTAINER ĐÃ ĐƯỢC KHÔI PHỤC -->
-    <!-- =============================================================== -->
+    <!-- ========================================== -->
+    <!-- THÊM MỚI: NÚT AI MAGIC Ở ĐÂY              -->
+    <!-- ========================================== -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_ai_magic"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="24dp"
+        android:src="@drawable/ic_ai_sparkle"
+        android:backgroundTint="#6200EE"
+        app:tint="#FFFFFF"
+        app:borderWidth="0dp"
+        app:elevation="6dp"
+        app:fabSize="normal"
+        app:layout_constraintBottom_toTopOf="@id/player_container"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Player Container (GIỮ NGUYÊN) -->
     <LinearLayout
         android:id="@+id/player_container"
         android:layout_width="0dp"
@@ -70,7 +86,8 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- Thanh tiến trình phát -->
+        <!-- Nội dung bên trong Player giữ nguyên như cũ... -->
+        <!-- (Bạn không cần copy lại ruột Player nếu đã có) -->
         <SeekBar
             android:id="@+id/seekbar"
             android:layout_width="match_parent"
@@ -80,7 +97,7 @@
             android:progressTint="#0A84FF"
             android:thumbTint="#0A84FF" />
 
-        <!-- Thời gian -->
+        <!-- ... Các phần còn lại của Player ... -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -143,6 +160,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 app:tint="#FFFFFF" />
         </LinearLayout>
+
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,6 +1,11 @@
 package com.example.audio2text.ui.detail;
 
-// Import các thư viện cần thiết
+import io.noties.markwon.Markwon;
+import android.app.AlertDialog;
+import android.view.LayoutInflater;
+import android.widget.Button;
+
+import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -9,6 +14,7 @@ import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -29,6 +35,9 @@ import com.example.audio2text.adapter.TranscriptAdapter;
 import com.example.audio2text.data.db.TranscriptionDatabaseHelper;
 import com.example.audio2text.model.TranscriptItem;
 import com.example.audio2text.model.TranscriptionRecord;
+// Import Helper AI và FloatingActionButton
+import com.example.audio2text.network.GeminiHelper;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,33 +55,39 @@ public class DetailFragment extends Fragment {
     private TextView tvCurrent, tvTotal;
     private ImageButton btnPlay;
     private ImageButton btnRewind, btnFastForward;
+    private TextView tvTitle;
+
+    // --- KHAI BÁO BIẾN CHO AI ---
+    private FloatingActionButton fabAi;
+    private GeminiHelper geminiHelper;
 
     private final List<TranscriptItem> transcriptList = new ArrayList<>();
     private TranscriptionDatabaseHelper db;
 
-    // Biến cho TextView tiêu đề
-    private TextView tvTitle;
-
-    // Code đã sửa bên trong DetailFragment.java
     public static DetailFragment newInstance(int recordId, String transcript) {
-        DetailFragment f = new DetailFragment(); // Đảm bảo ở đây là DetailFragment
+        DetailFragment f = new DetailFragment();
         Bundle b = new Bundle();
         b.putInt(ARG_RECORD_ID, recordId);
         b.putString(ARG_TRANSCRIPT, transcript);
         f.setArguments(b);
-        return f; // Đảm bảo trả về f, một đối tượng của DetailFragment
+        return f;
     }
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
+        // Lưu ý: Đảm bảo layout là fragment_main như bạn đã sửa
         return inflater.inflate(R.layout.fragment_main, container, false);
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         initViews(view);
+
+        // Khởi tạo AI Helper
+        geminiHelper = new GeminiHelper();
+
         setupRecyclerView();
         db = new TranscriptionDatabaseHelper(requireContext());
 
@@ -85,9 +100,9 @@ public class DetailFragment extends Fragment {
         }
 
         setupControls();
+        setupAiButton(); // <--- Cài đặt sự kiện cho nút AI
         startPlaybackSync();
 
-        // Xử lý sự kiện click cho nút sao chép
         ImageView ivCopy = view.findViewById(R.id.iv_copy_transcript);
         ivCopy.setOnClickListener(v -> copyTranscriptToClipboard());
     }
@@ -101,7 +116,96 @@ public class DetailFragment extends Fragment {
         tvTitle = view.findViewById(R.id.tv_title);
         btnRewind = view.findViewById(R.id.btn_rewind);
         btnFastForward = view.findViewById(R.id.btn_fast_forward);
+
+        // Ánh xạ nút AI Magic
+        fabAi = view.findViewById(R.id.fab_ai_magic);
     }
+
+    // --- HÀM XỬ LÝ AI ---
+    private void setupAiButton() {
+        fabAi.setOnClickListener(v -> {
+            String cleanText = getCleanTranscriptText(); // Lấy text không kèm timestamp
+
+            if (cleanText.isEmpty()) {
+                Toast.makeText(getContext(), "Chưa có nội dung để phân tích!", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // UI Feedback: Vô hiệu hóa nút và báo đang chạy
+            fabAi.setEnabled(false);
+            Toast.makeText(getContext(), "AI đang đọc và tóm tắt...", Toast.LENGTH_SHORT).show();
+
+            // Gọi Gemini Helper
+            geminiHelper.summarizeText(cleanText, new GeminiHelper.AiResponseCallback() {
+                @Override
+                public void onSuccess(String result) {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            fabAi.setEnabled(true);
+                            showResultDialog(result);
+                        });
+                    }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            fabAi.setEnabled(true);
+                            Toast.makeText(getContext(), "Lỗi AI: " + t.getMessage(), Toast.LENGTH_LONG).show();
+                            Log.e("GeminiError", t.getMessage());
+                        });
+                    }
+                }
+            });
+        });
+    }
+
+    // Hiển thị kết quả AI trả về bằng Dialog
+    private void showResultDialog(String aiResult) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+
+        // Inflate layout custom
+        View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_ai_result, null);
+        builder.setView(dialogView);
+
+        AlertDialog dialog = builder.create();
+        // Bo tròn góc dialog cho đẹp (Tuỳ chọn)
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            dialog.getWindow().setBackgroundDrawableResource(R.drawable.bg_dialog_rounded); // Bạn cần tạo drawable này nếu muốn bo góc
+        }
+
+        TextView tvContent = dialogView.findViewById(R.id.tv_markdown_content);
+        Button btnCopy = dialogView.findViewById(R.id.btn_dialog_copy);
+        Button btnClose = dialogView.findViewById(R.id.btn_dialog_close);
+
+        // Dùng Markwon để render text đẹp
+        final Markwon markwon = Markwon.create(requireContext());
+        markwon.setMarkdown(tvContent, aiResult);
+
+        btnCopy.setOnClickListener(v -> {
+            ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
+            ClipData clip = ClipData.newPlainText("AI Summary", aiResult);
+            clipboard.setPrimaryClip(clip);
+            Toast.makeText(getContext(), "Đã sao chép!", Toast.LENGTH_SHORT).show();
+        });
+
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+    }
+
+    // Lấy text sạch (chỉ nội dung lời nói) để gửi cho AI
+    private String getCleanTranscriptText() {
+        if (transcriptList.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (TranscriptItem item : transcriptList) {
+            sb.append(item.text).append(" "); // Chỉ lấy text, không lấy label thời gian
+        }
+        return sb.toString().trim();
+    }
+    // ---------------------
 
     private void setupRecyclerView() {
         rv.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -122,9 +226,6 @@ public class DetailFragment extends Fragment {
             return;
         }
 
-        // ===============================================================
-        // THAY ĐỔI Ở ĐÂY: Lấy tên file từ record.filename
-        // ===============================================================
         if (record.filename != null && !record.filename.isEmpty()) {
             tvTitle.setText(record.filename);
         } else {
@@ -138,9 +239,6 @@ public class DetailFragment extends Fragment {
     private void loadLatestTranscription() {
         TranscriptionRecord latest = db.getLatestRecord();
         if (latest != null) {
-            // ===============================================================
-            // THAY ĐỔI Ở ĐÂY: Lấy tên file từ latest.filename
-            // ===============================================================
             if (latest.filename != null && !latest.filename.isEmpty()) {
                 tvTitle.setText(latest.filename);
             } else {
@@ -155,7 +253,6 @@ public class DetailFragment extends Fragment {
     }
 
     private TranscriptionRecord findRecordById(int recordId) {
-        // Hàm này có thể cần được tối ưu hóa sau này, nhưng hiện tại vẫn hoạt động
         for (TranscriptionRecord r : db.getAllTranscriptions()) {
             if (r.id == recordId) return r;
         }
@@ -209,7 +306,7 @@ public class DetailFragment extends Fragment {
                 mediaPlayer.seekTo(newPosition);
             }
         });
-//        tua tiến
+
         btnFastForward.setOnClickListener(v -> {
             if (mediaPlayer != null) {
                 int current = mediaPlayer.getCurrentPosition();
@@ -217,6 +314,7 @@ public class DetailFragment extends Fragment {
                 mediaPlayer.seekTo(newPosition);
             }
         });
+
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser && mediaPlayer != null) {
@@ -289,7 +387,6 @@ public class DetailFragment extends Fragment {
         s %= 60;
         return String.format("%d:%02d", m, s);
     }
-
 
     private void copyTranscriptToClipboard() {
         String fullText = getFullTranscriptText();

@@ -1,21 +1,22 @@
 pluginManagement {
     repositories {
-        google {
-            content {
-                includeGroupByRegex("com\\.android.*")
-                includeGroupByRegex("com\\.google.*")
-                includeGroupByRegex("androidx.*")
-            }
-        }
+        // Xóa các bộ lọc content { ... } để đảm bảo không bị chặn nhầm plugin
+        google()
         mavenCentral()
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // Repository của Google (chứa Android SDK, AndroidX, Firebase...)
         google()
+
+        // Repository trung tâm (chứa thư viện AI Generative, OkHttp, Retrofit...)
         mavenCentral()
+
+        // Repository cho các thư viện bên thứ 3 (như biểu đồ, loading view...)
         maven { url 'https://jitpack.io' }
     }
 }
