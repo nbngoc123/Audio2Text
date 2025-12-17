@@ -23,7 +23,7 @@ public class GeminiHelper {
     // ===============================================================
     // DÁN KEY MỚI (TẠO TỪ DỰ ÁN MỚI) VÀO ĐÂY
     // ===============================================================
-    private static final String API_KEY = "AIzaSyDpIJ7oKHpQP7Lbv_oQkYtuiV0ybSwcEtc";
+    private static final String API_KEY = "AIzaSyBI8N4Dc1LaJeOnmzFJdwvoqDCE6gEekAk";
 
     // URL chuẩn theo tài liệu REST API
     private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + API_KEY;    private final OkHttpClient client;

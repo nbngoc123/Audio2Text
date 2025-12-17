@@ -72,8 +72,7 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
         v.put(T_COL_FILENAME, filename);
         v.put(T_COL_AUDIO_URI, audioUri);
         v.put(T_COL_TRANSCRIPT, transcript);
-        long id = db.insert(TABLE_TRANSCRIPTS, null, v);
-        return id;
+        return db.insert(TABLE_TRANSCRIPTS, null, v);
     }
 
     public void insertSentence(long recordId, String text, long startMs, long endMs, String speakerLabel) {
@@ -85,6 +84,20 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
         v.put(S_COL_END, endMs);
         v.put(S_COL_SPEAKER_LABEL, speakerLabel);
         db.insert(TABLE_SENTENCES, null, v);
+    }
+
+    // --- HÀM MỚI: CẬP NHẬT NỘI DUNG CÂU THOẠI ---
+    public void updateSentenceText(int recordId, long startTime, String newText) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(S_COL_TEXT, newText);
+
+        // Điều kiện: Cập nhật đúng bản ghi và đúng thời gian bắt đầu
+        String whereClause = S_COL_RECORD_ID + " = ? AND " + S_COL_START + " = ?";
+        String[] whereArgs = { String.valueOf(recordId), String.valueOf(startTime) };
+
+        db.update(TABLE_SENTENCES, values, whereClause, whereArgs);
+        db.close();
     }
 
     public List<TranscriptionRecord> getAllTranscriptions() {
@@ -161,11 +174,6 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
         db.delete(TABLE_TRANSCRIPTS, T_COL_ID + "=?", new String[]{String.valueOf(id)});
     }
 
-    /**
-     * Phương thức mới để lấy một số lượng giới hạn các bản ghi gần đây nhất.
-     * @param limit Số lượng bản ghi cần lấy.
-     * @return Danh sách các bản ghi.
-     */
     public List<TranscriptionRecord> getRecentTranscriptions(int limit) {
         List<TranscriptionRecord> records = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
