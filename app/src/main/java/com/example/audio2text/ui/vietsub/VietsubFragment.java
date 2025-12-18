@@ -25,6 +25,10 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+
+import com.example.audio2text.data.db.TranscriptionDatabaseHelper;
+import com.example.audio2text.network.AzureTTSManager;
+import com.example.audio2text.util.DubbingUtils;
 import com.example.audio2text.util.TranslateTranscripts;
 
 // --- IMPORT CHUẨN CỦA FFMPEG-KIT ---
@@ -49,7 +53,7 @@ import java.io.InputStream;
 import java.util.List;
 
 public class VietsubFragment extends Fragment {
-
+    private CheckBox cbEnableDubbing;
     private Button btnChooseVideo, btnProcess;
     private TextView txtStatus;
     private ProgressBar progressBar;
@@ -60,6 +64,7 @@ public class VietsubFragment extends Fragment {
     private volatile Thread processThread;
     private Spinner spinnerLanguage, spinnerTargetLanguage;
     private CheckBox cbExportSrt;
+    private TranscriptionDatabaseHelper dbHelper;
     private final ActivityResultLauncher<Intent> pickVideoLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -89,10 +94,12 @@ public class VietsubFragment extends Fragment {
         spinnerTargetLanguage = view.findViewById(R.id.spinnerTargetLanguage);
         cbExportSrt = view.findViewById(R.id.cbExportSrt);
         svc = new TranscriptionService(requireContext());
+        cbEnableDubbing = view.findViewById(R.id.cbEnableDubbing);
 
         btnChooseVideo.setOnClickListener(v -> pickVideo());
         btnProcess.setOnClickListener(v -> startVietsubProcess());
         setupLanguageSpinner();
+        dbHelper = new TranscriptionDatabaseHelper(requireContext());
     }
 
     private void pickVideo() {
@@ -176,7 +183,7 @@ public class VietsubFragment extends Fragment {
                 updateStatus("Đang tải phụ đề...");
                 String sentencesJson = getSentencesJson(transcriptId);
                 List<TranscriptItem> transcripts = TranscriptionService.parseSentences(result.toString());
-                // --- LOGIC DỊCH THUẬT MỚI ---
+                // --- LOGIC DỊCH THUẬT ---
                 String targetLang = getTargetLangCodeForMLKit();
 
                 String detectedLang = result.optString("language_code", "en");
@@ -204,11 +211,40 @@ public class VietsubFragment extends Fragment {
                     updateStatus("Đang xuất file SRT...");
                     exportSrtToPublic(srtFile);
                 }
+                File finalVideoToSub = inputVideoFile;
+                // 7b. Lồng tiếng (Auto Dubbing)
+                if (cbEnableDubbing.isChecked()) {
+                    updateStatus("Đang tiến hành lồng tiếng AI...");
+                    AzureTTSManager ttsManager = new AzureTTSManager();
+                    List<File> voiceFiles = DubbingUtils.generateVoiceOvers(
+                            transcripts, ttsManager, requireContext(), msg -> updateStatus(msg));
+
+                    updateStatus("Đang trộn âm thanh...");
+                    File dubOutputFile = new File(requireContext().getExternalFilesDir(Environment.DIRECTORY_MOVIES),
+                            "Dubbing_" + System.currentTimeMillis() + ".mp4");
+                    float backgroundVol = 0.45f;
+                    float dubbedVoiceVol = 2.5f;
+                    String dubCmd = DubbingUtils.buildFFmpegDubbingCommandWithDucking(
+                            inputVideoFile,
+                            voiceFiles,
+                            transcripts,
+                            dubOutputFile,
+                            backgroundVol,
+                            dubbedVoiceVol
+                    );
+
+                    FFmpegSession dubSession = FFmpegKit.execute(dubCmd);
+                    if (ReturnCode.isSuccess(dubSession.getReturnCode())) {
+                        finalVideoToSub = dubOutputFile;
+                    } else {
+                        throw new Exception("Lỗi lồng tiếng FFmpeg");
+                    }
+                }
                 // ---------------------------
 
                 // 8. Gắn Sub vào Video
                 updateStatus("Đang gắn phụ đề vào video...");
-                burnSubtitles(inputVideoFile, srtFile);
+                burnSubtitles(finalVideoToSub, srtFile);
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -237,8 +273,8 @@ public class VietsubFragment extends Fragment {
     }
 
     private File extractAudioFromVideo(File videoFile) throws Exception {
-//        File outputAudio = new File(requireContext().getCacheDir(), "extracted_audio.mp3");
-        File outputAudio = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "extracted_audio_TEST.mp3");
+        File outputAudio = new File(requireContext().getCacheDir(), "extracted_audio.mp3");
+//        File outputAudio = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "extracted_audio_TEST.mp3");
 
         // Xóa file cũ trước khi tách
         if (outputAudio.exists()) outputAudio.delete();
@@ -298,6 +334,11 @@ public class VietsubFragment extends Fragment {
                     txtStatus.setText("Thành công!\nLưu tại: " + outputFile.getAbsolutePath());
                     Toast.makeText(getContext(), "Xong! Video đã có phụ đề.", Toast.LENGTH_LONG).show();
                     saveToGallery(outputFile);
+                    // lưu vào db
+                    dbHelper.insertTranscript(outputFile.getName(), outputFile.getAbsolutePath(), "Video có phụ đề", 1);
+                    mainHandler.post(() -> {
+                        Toast.makeText(getContext(), "Đã lưu video vào lịch sử", Toast.LENGTH_SHORT).show();
+                    });
                 } else {
                     txtStatus.setText("Lỗi gắn sub (Xem Logcat)");
                     Log.e("VietsubError", session.getFailStackTrace());

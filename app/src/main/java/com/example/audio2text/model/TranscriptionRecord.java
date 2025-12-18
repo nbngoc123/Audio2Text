@@ -6,13 +6,15 @@ public class TranscriptionRecord {
     public String audioUri;
     public String transcript; // full text (optional)
     public String createdAt;
+    private int fileType; // 0 = Audio, 1 = Video
 
-    public TranscriptionRecord(int id, String filename, String audioUri, String transcript, String createdAt) {
+    public TranscriptionRecord(int id, String filename, String audioUri, String transcript, String createdAt, int fileType) {
         this.id = id;
         this.filename = filename;
         this.audioUri = audioUri;
         this.transcript = transcript;
         this.createdAt = createdAt;
+        this.fileType = fileType;
     }
 
     public int getId() {
@@ -53,5 +55,12 @@ public class TranscriptionRecord {
 
     public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
+    }
+    public int getFileType() {
+        return fileType;
+    }
+
+    public void setFileType(int fileType) {
+        this.fileType = fileType;
     }
 }

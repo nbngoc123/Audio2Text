@@ -19,6 +19,7 @@ import com.example.audio2text.adapter.HistoryAdapter;
 import com.example.audio2text.data.db.TranscriptionDatabaseHelper;
 import com.example.audio2text.model.TranscriptionRecord;
 import com.example.audio2text.ui.detail.DetailFragment;
+import com.example.audio2text.ui.detail.VideoPlayerFragment;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,33 +58,43 @@ public class HistoryFragment extends Fragment {
     }
 
     private void setupRecyclerView() {
-        // Tạo một listener để xử lý các sự kiện click từ adapter
         HistoryAdapter.OnHistoryItemListener listener = new HistoryAdapter.OnHistoryItemListener() {
             @Override
             public void onItemClick(TranscriptionRecord record) {
-                // Khi click vào một item, mở MainFragment với ID của record đó
-                DetailFragment detailFragment = DetailFragment.newInstance(record.getId(), record.getTranscript());
-                requireActivity().getSupportFragmentManager()
-                        .beginTransaction()
-                        .replace(R.id.main_container, detailFragment) // Đảm bảo ID container là chính xác
-                        .addToBackStack(null)
-                        .commit();
+                // Kiểm tra loại file từ record
+                if (record.getFileType() == 1) {
+                    VideoPlayerFragment videoPlayerFragment = VideoPlayerFragment.newInstance(
+                            record.getId(),
+                            record.getAudioUri(),
+                            record.getFilename()
+                    );
+                    requireActivity().getSupportFragmentManager()
+                            .beginTransaction()
+                            .replace(R.id.main_container, videoPlayerFragment)
+                            .addToBackStack(null)
+                            .commit();
+                } else {
+                    DetailFragment detailFragment = DetailFragment.newInstance(record.getId(), record.getTranscript());
+
+                    requireActivity().getSupportFragmentManager()
+                            .beginTransaction()
+                            .replace(R.id.main_container, detailFragment)
+                            .addToBackStack(null)
+                            .commit();
+                }
             }
 
             @Override
             public void onDeleteClick(TranscriptionRecord record) {
-                // Xử lý xóa record khỏi database và cập nhật lại danh sách
                 db.deleteTranscript(record.getId());
                 int position = allRecords.indexOf(record);
                 if (position != -1) {
                     allRecords.remove(position);
                 }
-                // Lọc lại danh sách sau khi xóa và cập nhật adapter
                 filterRecords(etSearch.getText().toString());
             }
         };
 
-        // Khởi tạo adapter với danh sách đã lọc và listener
         adapter = new HistoryAdapter(filteredRecords, listener);
         rvHistory.setAdapter(adapter);
     }

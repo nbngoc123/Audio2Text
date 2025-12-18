@@ -24,6 +24,8 @@ import com.example.audio2text.model.TranscriptItem;
 import com.example.audio2text.network.TranscriptionService;
 import com.example.audio2text.util.ApiKey;
 import com.example.audio2text.util.NetworkUtils;
+import com.example.audio2text.util.SubtitleUtils;
+
 import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -64,7 +66,7 @@ public class UploadFragment extends Fragment {
         svc = new TranscriptionService(requireContext());
         repo = new TranscriptionRepository(requireContext());
 
-        btnChoose.setOnClickListener(v -> pickAudio());
+        btnChoose.setOnClickListener(v -> pickFile());
         btnUpload.setOnClickListener(v -> startTranscription());
         btnCancel.setOnClickListener(v -> cancelTranscription());
 
@@ -81,10 +83,15 @@ public class UploadFragment extends Fragment {
         layoutProgress = view.findViewById(R.id.layout_progress);
     }
 
-    private void pickAudio() {
+    private void pickFile() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("audio/*");
-        startActivityForResult(Intent.createChooser(intent, "Chọn audio"), PICK_AUDIO);
+        intent.setType("*/*");
+
+        // Chỉ định rõ ràng cácđược chấp nhận (Audio và Video)
+        String[] mimeTypes = {"audio/*", "video/*"};
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+
+        startActivityForResult(Intent.createChooser(intent, "Chọn tập tin"), PICK_AUDIO);
     }
 
     @Override
@@ -98,80 +105,116 @@ public class UploadFragment extends Fragment {
         }
     }
 
-    private void startTranscription() {
-        if (selectedUri == null) {
-            Toast.makeText(getContext(), "Vui lòng chọn một file âm thanh trước", Toast.LENGTH_SHORT).show();
-            return;
-        }
 
-        if (!NetworkUtils.isNetworkAvailable(requireContext())) {
-            Toast.makeText(getContext(), "Không có kết nối Internet. Vui lòng thử lại.", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        setLoadingState();
-
-        transcriptionThread = new Thread(() -> {
-            try {
-                updateProgressStatus("Chuẩn bị file...");
-                tempFile = copyUriToFile(selectedUri);
-
-                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-                updateProgressStatus("Đang upload...");
-                String uploadUrl = svc.uploadFile(tempFile);
-                if (uploadUrl == null) throw new Exception("Upload thất bại!");
-
-                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-                updateProgressStatus("Tạo transcript...");
-                JSONObject createRes = svc.createTranscript(uploadUrl, "vi", false);
-                String transcriptId = createRes.optString("id");
-                if (transcriptId.isEmpty()) {
-                    String error = createRes.optString("error");
-                    if (!error.isEmpty()) throw new Exception("Lỗi API: " + error);
-                    throw new Exception("Không nhận được transcript ID");
-                }
-
-                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-                updateProgressStatus("Đang chờ kết quả...");
-                JSONObject result = svc.pollForResult(transcriptId, 120, 2000);
-                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-
-                if (result == null) {
-                    throw new Exception("Quá thời gian chờ kết quả");
-                }
-
-                String status = result.optString("status");
-                if ("error".equals(status)) {
-                    throw new Exception("Lỗi xử lý file từ API: " + result.optString("error"));
-                }
-                if (!"completed".equals(status)) {
-                    throw new Exception("Transcript không hoàn tất, trạng thái: " + status);
-                }
-
-                updateProgressStatus("Đang tải câu thoại...");
-                List<TranscriptItem> list = TranscriptionService.parseSentences(result.toString());
-                saveToDatabase(tempFile.getName(), tempFile.getAbsolutePath(), result.optString("text", ""), list);
-
-                mainHandler.post(() -> {
-                    Toast.makeText(requireContext(), "Hoàn tất và đã lưu thành công!", Toast.LENGTH_LONG).show();
-                    setIdleState();
-                });
-
-            } catch (InterruptedException e) {
-                handleCancellation();
-                Thread.currentThread().interrupt();
-            } catch (Exception e) {
-                if (Thread.currentThread().isInterrupted()) {
-                    handleCancellation();
-                } else {
-                    mainHandler.post(() -> showError(e.getMessage()));
-                }
-            } finally {
-                transcriptionThread = null;
-            }
-        });
-        transcriptionThread.start();
+private void startTranscription() {
+    if (selectedUri == null) {
+        Toast.makeText(getContext(), "Vui lòng chọn một file trước", Toast.LENGTH_SHORT).show();
+        return;
     }
+
+    if (!NetworkUtils.isNetworkAvailable(requireContext())) {
+        Toast.makeText(getContext(), "Không có kết nối Internet. Vui lòng thử lại.", Toast.LENGTH_LONG).show();
+        return;
+    }
+
+    setLoadingState();
+
+    transcriptionThread = new Thread(() -> {
+        try {
+            // 1. Sao chép file từ URI vào bộ nhớ tạm của App
+            updateProgressStatus("Chuẩn bị file...");
+            File initialFile = copyUriToFile(selectedUri);
+
+            // Kiểm tra loại file
+            String mimeType = requireContext().getContentResolver().getType(selectedUri);
+            boolean isVideo = false;
+
+            if (mimeType != null) {
+                isVideo = mimeType.startsWith("video/");
+            } else {
+                String fileName = initialFile.getName().toLowerCase();
+                isVideo = fileName.endsWith(".mp4") || fileName.endsWith(".mkv") ||
+                        fileName.endsWith(".mov") || fileName.endsWith(".avi") ||
+                        fileName.endsWith(".wmv") || fileName.endsWith(".flv");
+            }
+            //  (0: mp3, 1: vid)
+            int fileType = isVideo ? 1 : 0;
+
+            // 2. Nếu là video tách âm thanh
+            if (isVideo) {
+                updateProgressStatus("Đang tách âm thanh từ video...");
+                tempFile = SubtitleUtils.extractAudioFromVideo(requireContext(), initialFile);
+
+                // xóa file vido tạm sau khi đã tách
+                if (initialFile.exists()) initialFile.delete();
+            } else {
+                tempFile = initialFile;
+            }
+
+            // 3. Tiến hành Upload (Sử dụng file đã xử lý - tempFile)
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+            updateProgressStatus("Đang upload...");
+            String uploadUrl = svc.uploadFile(tempFile);
+            if (uploadUrl == null) throw new Exception("Upload thất bại!");
+
+            // 4. Tạo Transcript
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+            updateProgressStatus("Tạo transcript...");
+            JSONObject createRes = svc.createTranscript(uploadUrl, "vi", false);
+            String transcriptId = createRes.optString("id");
+            if (transcriptId.isEmpty()) {
+                String error = createRes.optString("error");
+                if (!error.isEmpty()) throw new Exception("Lỗi API: " + error);
+                throw new Exception("Không nhận được transcript ID");
+            }
+
+            // 5. Chờ kết quả từ Server
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+            updateProgressStatus("Đang chờ kết quả...");
+            JSONObject result = svc.pollForResult(transcriptId, 120, 2000);
+
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+
+            if (result == null) {
+                throw new Exception("Quá thời gian chờ kết quả");
+            }
+
+            String status = result.optString("status");
+            if ("error".equals(status)) {
+                throw new Exception("Lỗi xử lý file từ API: " + result.optString("error"));
+            }
+            if (!"completed".equals(status)) {
+                throw new Exception("Transcript không hoàn tất, trạng thái: " + status);
+            }
+
+            // 6. Phân tích và lưu vào Database
+            updateProgressStatus("Đang tải câu thoại...");
+            List<TranscriptItem> list = TranscriptionService.parseSentences(result.toString());
+
+            // Lấy tên file gốc để lưu vào DB
+            String originalName = getFileNameFromUri(selectedUri);
+            saveToDatabase(originalName, tempFile.getAbsolutePath(), result.optString("text", ""), list, fileType);
+
+            mainHandler.post(() -> {
+                Toast.makeText(requireContext(), "Hoàn tất!", Toast.LENGTH_LONG).show();
+                setIdleState();
+            });
+
+        } catch (InterruptedException e) {
+            handleCancellation();
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            if (Thread.currentThread().isInterrupted()) {
+                handleCancellation();
+            } else {
+                mainHandler.post(() -> showError(e.getMessage()));
+            }
+        } finally {
+            transcriptionThread = null;
+        }
+    });
+    transcriptionThread.start();
+}
 
     private void cancelTranscription() {
         if (transcriptionThread != null) {
@@ -210,8 +253,9 @@ public class UploadFragment extends Fragment {
         setIdleState();
     }
 
-    private void saveToDatabase(String name, String audioUriString, String fullText, List<TranscriptItem> items) {
-        long recId = repo.insertTranscript(name, audioUriString, fullText);
+    private void saveToDatabase(String name, String audioUriString, String fullText, List<TranscriptItem> items, int fileType) {
+        // Gọi repo mới với 4 tham số
+        long recId = repo.insertTranscript(name, audioUriString, fullText, fileType);
         for (TranscriptItem it : items) {
             repo.insertSentence(recId, it.text, it.startTimeMs, it.endTimeMs, it.speaker);
         }

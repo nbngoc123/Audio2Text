@@ -15,14 +15,16 @@ public class TranscriptionRepository {
         db = new TranscriptionDatabaseHelper(ctx);
     }
 
-    public long insertTranscript(String filename, String audioUri, String transcript) {
-        return db.insertTranscript(filename, audioUri, transcript);
+    public long insertTranscript(String filename, String audioUri, String transcript, int fileType) {
+        return db.insertTranscript(filename, audioUri, transcript, fileType);
     }
 
     public void insertSentence(long recordId, String text, long startMs, long endMs, String speakerLabel) {
         db.insertSentence(recordId, text, startMs, endMs, speakerLabel);
     }
-
+    public TranscriptionRecord getRecordById(int recordId) {
+        return db.getRecordById(recordId);
+    }
     public List<TranscriptionRecord> getAllTranscriptions() {
         return db.getAllTranscriptions();
     }
@@ -36,6 +38,9 @@ public class TranscriptionRepository {
     }
     public void deleteTranscript(int id) {
         db.deleteTranscript(id);
+    }
+    public List<TranscriptionRecord> getRecentTranscriptions(int limit) {
+        return db.getRecentTranscriptions(limit);
     }
 
 }

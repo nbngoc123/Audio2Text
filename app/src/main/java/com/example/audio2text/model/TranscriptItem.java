@@ -15,4 +15,11 @@ public class TranscriptItem {
         this.endTimeMs = endTimeMs;
         this.speaker = speaker;
     }
+    public String getText() {
+        return text;
+    }
+
+    public long getStart() {
+        return startTimeMs;
+    }
 }

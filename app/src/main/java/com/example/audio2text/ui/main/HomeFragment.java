@@ -17,6 +17,7 @@ import com.example.audio2text.adapter.HistoryAdapter;
 import com.example.audio2text.data.db.TranscriptionDatabaseHelper;
 import com.example.audio2text.model.TranscriptionRecord;
 import com.example.audio2text.ui.detail.DetailFragment;
+import com.example.audio2text.ui.detail.VideoPlayerFragment;
 import com.google.android.material.card.MaterialCardView;
 
 import java.util.List;
@@ -66,12 +67,26 @@ public class HomeFragment extends Fragment {
         HistoryAdapter.OnHistoryItemListener listener = new HistoryAdapter.OnHistoryItemListener() {
             @Override
             public void onItemClick(TranscriptionRecord record) {
-                DetailFragment detailFragment = DetailFragment.newInstance(record.getId(), record.getTranscript());
+                String path = record.getAudioUri(); // Giả sử đây là nơi lưu path file
 
-                requireActivity().getSupportFragmentManager().beginTransaction()
-                        .replace(R.id.main_container, detailFragment)
-                        .addToBackStack(null)
-                        .commit();
+                if (path != null && path.endsWith(".mp4")) {
+                    VideoPlayerFragment videoFragment = VideoPlayerFragment.newInstance(
+                            record.getId(),
+                            record.getAudioUri(),
+                            record.getFilename()
+                    );
+
+                    requireActivity().getSupportFragmentManager().beginTransaction()
+                            .replace(R.id.main_container, videoFragment)
+                            .addToBackStack(null)
+                            .commit();
+                } else {
+                    DetailFragment detailFragment = DetailFragment.newInstance(record.getId(), record.getTranscript());
+                    requireActivity().getSupportFragmentManager().beginTransaction()
+                            .replace(R.id.main_container, detailFragment)
+                            .addToBackStack(null)
+                            .commit();
+                }
             }
 
             @Override

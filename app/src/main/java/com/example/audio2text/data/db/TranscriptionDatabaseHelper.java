@@ -14,7 +14,7 @@ import java.util.List;
 public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "audio_transcripts.db";
-    private static final int DB_VERSION = 2;
+    private static final int DB_VERSION = 3;
 
     public static final String TABLE_TRANSCRIPTS = "transcripts";
     public static final String T_COL_ID = "id";
@@ -30,6 +30,7 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
     public static final String S_COL_START = "start_ms";
     public static final String S_COL_END = "end_ms";
     public static final String S_COL_SPEAKER_LABEL = "speaker_label";
+    public static final String T_COL_FILE_TYPE = "file_type";
 
     public TranscriptionDatabaseHelper(Context context) {
         super(context, DB_NAME, null, DB_VERSION);
@@ -61,17 +62,21 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldV, int newV) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_SENTENCES);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_TRANSCRIPTS);
-        onCreate(db);
+//        db.execSQL("DROP TABLE IF EXISTS " + TABLE_SENTENCES);
+//        db.execSQL("DROP TABLE IF EXISTS " + TABLE_TRANSCRIPTS);
+//        onCreate(db);
+        if (oldV < 3) {
+            db.execSQL("ALTER TABLE " + TABLE_TRANSCRIPTS + " ADD COLUMN " + T_COL_FILE_TYPE + " INTEGER DEFAULT 0");
+        }
     }
 
-    public long insertTranscript(String filename, String audioUri, String transcript) {
+    public long insertTranscript(String filename, String audioUri, String transcript, int fileType) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues v = new ContentValues();
         v.put(T_COL_FILENAME, filename);
         v.put(T_COL_AUDIO_URI, audioUri);
         v.put(T_COL_TRANSCRIPT, transcript);
+        v.put(T_COL_FILE_TYPE, fileType);
         return db.insert(TABLE_TRANSCRIPTS, null, v);
     }
 
@@ -97,7 +102,7 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
         String[] whereArgs = { String.valueOf(recordId), String.valueOf(startTime) };
 
         db.update(TABLE_SENTENCES, values, whereClause, whereArgs);
-        db.close();
+//        db.close();
     }
 
     public List<TranscriptionRecord> getAllTranscriptions() {
@@ -107,14 +112,7 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
 
         if (c != null && c.moveToFirst()) {
             do {
-                TranscriptionRecord r = new TranscriptionRecord(
-                        c.getInt(c.getColumnIndexOrThrow(T_COL_ID)),
-                        c.getString(c.getColumnIndexOrThrow(T_COL_FILENAME)),
-                        c.getString(c.getColumnIndexOrThrow(T_COL_AUDIO_URI)),
-                        c.getString(c.getColumnIndexOrThrow(T_COL_TRANSCRIPT)),
-                        c.getString(c.getColumnIndexOrThrow(T_COL_CREATED_AT))
-                );
-                out.add(r);
+                out.add(createRecordFromCursor(c));
             } while (c.moveToNext());
             c.close();
         }
@@ -138,7 +136,8 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
                     c.getString(c.getColumnIndexOrThrow(T_COL_FILENAME)),
                     c.getString(c.getColumnIndexOrThrow(T_COL_AUDIO_URI)),
                     c.getString(c.getColumnIndexOrThrow(T_COL_TRANSCRIPT)),
-                    c.getString(c.getColumnIndexOrThrow(T_COL_CREATED_AT))
+                    c.getString(c.getColumnIndexOrThrow(T_COL_CREATED_AT)),
+                    c.getInt(c.getColumnIndexOrThrow(T_COL_FILE_TYPE))
             );
             c.close();
             return r;
@@ -159,7 +158,8 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
                     c.getString(c.getColumnIndexOrThrow(T_COL_FILENAME)),
                     c.getString(c.getColumnIndexOrThrow(T_COL_AUDIO_URI)),
                     c.getString(c.getColumnIndexOrThrow(T_COL_TRANSCRIPT)),
-                    c.getString(c.getColumnIndexOrThrow(T_COL_CREATED_AT))
+                    c.getString(c.getColumnIndexOrThrow(T_COL_CREATED_AT)),
+                    c.getInt(c.getColumnIndexOrThrow(T_COL_FILE_TYPE))
             );
             c.close();
             return r;
@@ -168,6 +168,16 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
         return null;
     }
 
+    private TranscriptionRecord createRecordFromCursor(Cursor c) {
+        return new TranscriptionRecord(
+                c.getInt(c.getColumnIndexOrThrow(T_COL_ID)),
+                c.getString(c.getColumnIndexOrThrow(T_COL_FILENAME)),
+                c.getString(c.getColumnIndexOrThrow(T_COL_AUDIO_URI)),
+                c.getString(c.getColumnIndexOrThrow(T_COL_TRANSCRIPT)),
+                c.getString(c.getColumnIndexOrThrow(T_COL_CREATED_AT)),
+                c.getInt(c.getColumnIndexOrThrow(T_COL_FILE_TYPE))
+        );
+    }
     public void deleteTranscript(int id) {
         SQLiteDatabase db = getWritableDatabase();
         db.delete(TABLE_SENTENCES, S_COL_RECORD_ID + "=?", new String[]{String.valueOf(id)});
@@ -177,18 +187,13 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
     public List<TranscriptionRecord> getRecentTranscriptions(int limit) {
         List<TranscriptionRecord> records = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
-        Cursor cursor = db.query(TABLE_TRANSCRIPTS, null, null, null, null, null, T_COL_ID + " DESC", String.valueOf(limit));
+        Cursor c = db.query(TABLE_TRANSCRIPTS, null, null, null, null, null, T_COL_ID + " DESC", String.valueOf(limit));
 
-        if (cursor != null && cursor.moveToFirst()) {
+        if (c != null && c.moveToFirst()) {
             do {
-                int id = cursor.getInt(cursor.getColumnIndexOrThrow(T_COL_ID));
-                String filename = cursor.getString(cursor.getColumnIndexOrThrow(T_COL_FILENAME));
-                String audioUri = cursor.getString(cursor.getColumnIndexOrThrow(T_COL_AUDIO_URI));
-                String transcript = cursor.getString(cursor.getColumnIndexOrThrow(T_COL_TRANSCRIPT));
-                String createdAt = cursor.getString(cursor.getColumnIndexOrThrow(T_COL_CREATED_AT));
-                records.add(new TranscriptionRecord(id, filename, audioUri, transcript, createdAt));
-            } while (cursor.moveToNext());
-            cursor.close();
+                records.add(createRecordFromCursor(c));
+            } while (c.moveToNext());
+            c.close();
         }
         return records;
     }
