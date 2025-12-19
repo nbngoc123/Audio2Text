@@ -11,7 +11,7 @@ import java.io.FileOutputStream;
 
 public class AzureTTSManager {
     private SpeechConfig speechConfig;
-    private static final String AZURE_KEY = "6lvGCEMOjWwlR86iys8qPSd504eRNbMYoJD1lKfbkWnLvvt232O0JQQJ99BLAC3pKaRXJ3w3AAAYACOGm86L";
+    private static final String AZURE_KEY = "";
     private static final String AZURE_REGION = "eastasia";
 
     public AzureTTSManager() {

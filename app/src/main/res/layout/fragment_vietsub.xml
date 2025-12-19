@@ -1,137 +1,152 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:padding="24dp"
+    android:fillViewport="true"
     android:background="#121212">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="TẠO VIDEO VIETSUB"
-        android:textColor="@android:color/white"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="30dp"/>
-
-    <Button
-        android:id="@+id/btnSelectVideo"
-        android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:text="1. Chọn Video MP4"
-        android:backgroundTint="#6200EE"
-        android:layout_marginBottom="16dp"/>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="#1E1E1E"
-        android:padding="10dp"
-        android:layout_marginBottom="16dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Ngôn ngữ nói:"
-            android:textColor="#CCCCCC"
-            android:textSize="16sp"
-            android:layout_marginEnd="12dp"/>
-
-        <Spinner
-            android:id="@+id/spinnerLanguage"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:backgroundTint="#FFFFFF"
-            android:spinnerMode="dropdown"/>
-    </LinearLayout>
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="⬇ Dịch sang (Translate to) ⬇"
-        android:gravity="center"
-        android:textColor="#888888"
-        android:layout_marginTop="5dp"
-        android:layout_marginBottom="5dp"/>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="#1E1E1E"
-        android:padding="10dp"
-        android:layout_marginBottom="16dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Ngôn ngữ đích:"
-            android:textColor="#CCCCCC"
-            android:textSize="16sp"
-            android:layout_marginEnd="12dp"/>
-
-        <Spinner
-            android:id="@+id/spinnerTargetLanguage"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:backgroundTint="#FFFFFF"
-            android:spinnerMode="dropdown"/>
-    </LinearLayout>
-
-    <CheckBox
-        android:id="@+id/cbExportSrt"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Lưu file phụ đề (.srt) ra máy"
-        android:textColor="#FFFFFF"
-        android:layout_marginBottom="16dp"/>
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="#1E1E1E"
-        android:padding="10dp"
-        android:layout_marginBottom="16dp">
+        android:gravity="center_horizontal"
+        android:padding="24dp">
 
-        <CheckBox
-            android:id="@+id/cbEnableDubbing"
+        <!-- TITLE -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="TẠO VIDEO VIETSUB"
+            android:textColor="@android:color/white"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="30dp"/>
+
+        <!-- SELECT VIDEO -->
+        <Button
+            android:id="@+id/btnSelectVideo"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:text="1. Chọn Video MP4"
+            android:backgroundTint="#6200EE"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- SOURCE LANGUAGE -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Lồng tiếng AI (Giọng Nam - Việt)"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="#1E1E1E"
+            android:padding="10dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ngôn ngữ nói:"
+                android:textColor="#CCCCCC"
+                android:textSize="16sp"
+                android:layout_marginEnd="12dp"/>
+
+            <Spinner
+                android:id="@+id/spinnerLanguage"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:spinnerMode="dropdown"/>
+        </LinearLayout>
+
+        <!-- ARROW -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⬇ Dịch sang (Translate to) ⬇"
+            android:gravity="center"
+            android:textColor="#888888"
+            android:layout_marginBottom="12dp"/>
+
+        <!-- TARGET LANGUAGE -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="#1E1E1E"
+            android:padding="10dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ngôn ngữ đích:"
+                android:textColor="#CCCCCC"
+                android:textSize="16sp"
+                android:layout_marginEnd="12dp"/>
+
+            <Spinner
+                android:id="@+id/spinnerTargetLanguage"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:spinnerMode="dropdown"/>
+        </LinearLayout>
+
+        <!-- EXPORT SRT -->
+        <CheckBox
+            android:id="@+id/cbExportSrt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Lưu file phụ đề (.srt) ra máy"
             android:textColor="#FFFFFF"
-            android:buttonTint="#009688" />
+            android:layout_marginBottom="16dp"/>
+
+        <!-- AI DUBBING -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#1E1E1E"
+            android:padding="10dp"
+            android:layout_marginBottom="16dp">
+
+            <CheckBox
+                android:id="@+id/cbEnableDubbing"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Lồng tiếng AI (Giọng Nam - Việt)"
+                android:textColor="#FFFFFF"
+                android:buttonTint="#009688"/>
+        </LinearLayout>
+
+        <!-- PROCESS BUTTON -->
+        <Button
+            android:id="@+id/btnProcess"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:text="2. Tạo Vietsub Ngay"
+            android:backgroundTint="#009688"
+            android:visibility="gone"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- PROGRESS -->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- STATUS -->
+        <TextView
+            android:id="@+id/txtStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Chọn video để bắt đầu"
+            android:textColor="#AAAAAA"
+            android:gravity="center"
+            android:textSize="14sp"/>
 
     </LinearLayout>
 
-    <Button
-        android:id="@+id/btnProcess"
-        android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:text="2. Tạo Vietsub Ngay"
-        android:backgroundTint="#009688"
-        android:visibility="gone"
-        android:layout_marginBottom="16dp"/>
-
-    <ProgressBar
-        android:id="@+id/progressBar"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:visibility="gone"
-        android:layout_marginBottom="16dp"/>
-
-    <TextView
-        android:id="@+id/txtStatus"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Chọn video để bắt đầu"
-        android:textColor="#AAAAAA"
-        android:gravity="center"
-        android:textSize="14sp"/>
-
-
-
-</LinearLayout>
+</ScrollView>
