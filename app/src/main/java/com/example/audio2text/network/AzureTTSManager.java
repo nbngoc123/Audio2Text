@@ -12,7 +12,7 @@ import java.io.FileOutputStream;
 public class AzureTTSManager {
     private SpeechConfig speechConfig;
     private static final String AZURE_KEY = "";
-    private static final String AZURE_REGION = "eastasia";
+    private static final String AZURE_REGION = "";
 
     public AzureTTSManager() {
         speechConfig = SpeechConfig.fromSubscription(AZURE_KEY, AZURE_REGION);
