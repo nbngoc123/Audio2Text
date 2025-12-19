@@ -9,10 +9,14 @@ if (localPropertiesFile.exists()) {
     localProperties.load(new FileInputStream(localPropertiesFile))
 }
 
+
 android {
     namespace 'com.example.audio2text'
     compileSdk 36
 
+    buildFeatures {
+        buildConfig = true
+    }
     defaultConfig {
         applicationId "com.example.audio2text"
         minSdk 24
@@ -22,6 +26,11 @@ android {
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
+        def azureKey = localProperties.getProperty("AZURE_SPEECH_KEY", "")
+        def azureRegion = localProperties.getProperty("AZURE_SPEECH_REGION", "eastasia")
+
+        buildConfigField "String", "AZURE_KEY", "\"${azureKey}\""
+        buildConfigField "String", "AZURE_REGION", "\"${azureRegion}\""
 
     }
 

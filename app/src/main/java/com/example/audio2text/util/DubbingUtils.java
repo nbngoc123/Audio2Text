@@ -7,6 +7,7 @@ import com.example.audio2text.network.AzureTTSManager;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class DubbingUtils {
 
@@ -70,15 +71,13 @@ public class DubbingUtils {
         filter.append("-filter_complex \"");
 
         // 1. Áp dụng âm lượng cho background
-        filter.append(String.format("[0:a]volume=%.2f[bg];", bgVolume));
+        filter.append(String.format(Locale.US, "[0:a]volume=%.2f[bg];", bgVolume));
 
-        // 2. Căn chỉnh timing và âm lượng cho từng đoạn lồng tiếng
         for (int i = 0; i < items.size(); i++) {
             long startMs = items.get(i).getStart();
-            // Áp dụng voiceVolume cho từng đoạn audio AI
-            filter.append(String.format("[%d:a]adelay=%d:all=1,volume=%.2f[a%d];",
+            filter.append(String.format(Locale.US, "[%d:a]adelay=%d:all=1,volume=%.2f[a%d];",
                     i + 1, startMs, voiceVolume, i + 1));
-            amixLabels.append(String.format("[a%d]", i + 1));
+            amixLabels.append(String.format(Locale.US, "[a%d]", i + 1));
         }
 
         // 3. Trộn tất cả lại với nhau

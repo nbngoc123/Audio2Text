@@ -233,15 +233,26 @@ public class VietsubFragment extends Fragment {
                             dubbedVoiceVol
                     );
 
+//                    FFmpegSession dubSession = FFmpegKit.execute(dubCmd);
+//                    if (ReturnCode.isSuccess(dubSession.getReturnCode())) {
+//                        finalVideoToSub = dubOutputFile;
+//                        Log.d("Dubbing", "Trộn âm thanh thành công!");
+//                    } else {
+//                        Log.e("DubbingError", "Mã lỗi: " + dubSession.getReturnCode());
+//                        Log.e("DubbingError", "Nội dung lỗi: " + dubSession.getOutput());
+//                        throw new Exception("Lỗi lồng tiếng FFmpeg: " + dubSession.getFailStackTrace());
+//                    }
+
                     FFmpegSession dubSession = FFmpegKit.execute(dubCmd);
                     if (ReturnCode.isSuccess(dubSession.getReturnCode())) {
                         finalVideoToSub = dubOutputFile;
-                        Log.d("Dubbing", "Trộn âm thanh thành công!");
                     } else {
-                        // QUAN TRỌNG: Log lỗi chi tiết
-                        Log.e("DubbingError", "Mã lỗi: " + dubSession.getReturnCode());
-                        Log.e("DubbingError", "Nội dung lỗi: " + dubSession.getOutput());
-                        throw new Exception("Lỗi lồng tiếng FFmpeg: " + dubSession.getFailStackTrace());
+                        String lastLog = dubSession.getOutput();
+                        if (lastLog == null) lastLog = "Tiến trình bị hệ thống kill (Out of Memory/Command too long)";
+
+                        Log.e("DubbingDebug", "Lệnh: " + dubCmd);
+                        Log.e("DubbingDebug", "Lỗi: " + lastLog);
+                        throw new Exception("FFmpeg Error: " + lastLog);
                     }
                 }
                 // ---------------------------

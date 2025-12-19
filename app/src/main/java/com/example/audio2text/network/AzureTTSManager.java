@@ -8,14 +8,15 @@ import com.microsoft.cognitiveservices.speech.SpeechSynthesisResult;
 import com.microsoft.cognitiveservices.speech.SpeechSynthesizer;
 import java.io.File;
 import java.io.FileOutputStream;
+import com.example.audio2text.BuildConfig;
 
 public class AzureTTSManager {
     private SpeechConfig speechConfig;
-    private static final String AZURE_KEY = "";
-    private static final String AZURE_REGION = "";
+    String key = BuildConfig.AZURE_KEY;
+    String region = BuildConfig.AZURE_REGION;
 
     public AzureTTSManager() {
-        speechConfig = SpeechConfig.fromSubscription(AZURE_KEY, AZURE_REGION);
+        speechConfig = SpeechConfig.fromSubscription(key, region);
         speechConfig.setSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Riff24Khz16BitMonoPcm);
         speechConfig.setSpeechSynthesisVoiceName("vi-VN-NamMinhNeural");
     }
