@@ -236,8 +236,12 @@ public class VietsubFragment extends Fragment {
                     FFmpegSession dubSession = FFmpegKit.execute(dubCmd);
                     if (ReturnCode.isSuccess(dubSession.getReturnCode())) {
                         finalVideoToSub = dubOutputFile;
+                        Log.d("Dubbing", "Trộn âm thanh thành công!");
                     } else {
-                        throw new Exception("Lỗi lồng tiếng FFmpeg");
+                        // QUAN TRỌNG: Log lỗi chi tiết
+                        Log.e("DubbingError", "Mã lỗi: " + dubSession.getReturnCode());
+                        Log.e("DubbingError", "Nội dung lỗi: " + dubSession.getOutput());
+                        throw new Exception("Lỗi lồng tiếng FFmpeg: " + dubSession.getFailStackTrace());
                     }
                 }
                 // ---------------------------

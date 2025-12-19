@@ -62,9 +62,9 @@ public class TranscriptionDatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldV, int newV) {
-//        db.execSQL("DROP TABLE IF EXISTS " + TABLE_SENTENCES);
-//        db.execSQL("DROP TABLE IF EXISTS " + TABLE_TRANSCRIPTS);
-//        onCreate(db);
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_SENTENCES);
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_TRANSCRIPTS);
+        onCreate(db);
         if (oldV < 3) {
             db.execSQL("ALTER TABLE " + TABLE_TRANSCRIPTS + " ADD COLUMN " + T_COL_FILE_TYPE + " INTEGER DEFAULT 0");
         }
